@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <cstring>
 #include "endian.h"
 #include "PCM16Factory.h"
 

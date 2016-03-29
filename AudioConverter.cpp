@@ -179,7 +179,7 @@ namespace RSTMCPP {
 
 		void EncodeBlock(int16_t* source, int samples, uint8_t* dest, int16_t* coefs) {
 			for (int i = 0; i < samples; i += 14, source += 14, dest += 8)
-				EncodeChunk(source, std::fmin(samples - i, 14), dest, coefs);
+				EncodeChunk(source, std::min(samples - i, 14), dest, coefs);
 		}
 
 		//Make sure source includes the yn values (16 samples total)

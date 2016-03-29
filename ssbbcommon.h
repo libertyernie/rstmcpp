@@ -4,9 +4,6 @@ using namespace RSTMCPP::endian;
 
 namespace RSTMCPP
 {
-	/*
-	unsafe struct NW4RCommonHeader
-	*/
 	struct NW4RCommonHeader
 	{
 		le_uint32_t _tag;
@@ -17,9 +14,6 @@ namespace RSTMCPP
 		be_uint16_t _numEntries;
 	};
 
-	/*
-	public unsafe struct ruint
-	*/
 	struct ruint
 	{
 		enum RefType : uint8_t
@@ -46,15 +40,12 @@ namespace RSTMCPP
 			_dataOffset = data;
 		}
 
-		void* Offset(void* baseAddr) { return (byte*)baseAddr + _dataOffset; }
+		void* Offset(void* baseAddr) { return (uint8_t*)baseAddr + _dataOffset; }
 
 		ruint(int r) : _refType(1), _dataType(0), _reserved(0), _dataOffset(r) {}
 		operator int() const { return _dataOffset; }
 	};
 
-	/*
-	public unsafe struct RuintList
-	*/
 	struct RuintList
 	{
 		//This address is the base of all ruint entry offsets
@@ -68,12 +59,9 @@ namespace RSTMCPP
 			return Entries() + index;
 		}
 
-		void* Get(void* offset, int index) { return (byte*)offset + (int)Entries()[index]; }
+		void* Get(void* offset, int index) { return (uint8_t*)offset + (int)Entries()[index]; }
 	};
 
-	/*
-	unsafe struct RuintCollection
-	*/
 	struct RuintCollection
 	{
 	private:

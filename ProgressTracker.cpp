@@ -8,9 +8,6 @@ RSTMCPP::ProgressTracker::ProgressTracker() {
 	this->cancelled = false;
 }
 
-/*
-		public void Begin(float min, float max, float current) {
-*/
 void RSTMCPP::ProgressTracker::begin(float min, float max, float current) {
 	this->minValue = min;
 	this->maxValue = max;

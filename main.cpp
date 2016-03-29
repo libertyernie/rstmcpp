@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstring>
 #include "PCM16Factory.h"
 #include "RSTMConverter.h"
 
@@ -9,9 +10,9 @@ using namespace RSTMCPP::WAV;
 
 int usage() {
 	cerr
-	<< "stm-encode - encode and convert between RSTM, CSTM, and FSTM" << endl
+	<< "rstmcpp - encode and convert between RSTM, CSTM, and FSTM" << endl
 	<< "Based on code from BrawlLib" << endl
-	<< "https://github.com/libertyernie/LoopingAudioConverter/stm-encode" << endl
+	<< "https://github.com/libertyernie/RSTMCPP" << endl
 	<< endl
 	<< "This program is provided as - is without any warranty, implied or otherwise." << endl
 	<< "By using this program, the end user agrees to take full responsibility" << endl

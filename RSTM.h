@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstring>
+
 #include "ssbbcommon.h"
 #include "RWAV.h"
 
@@ -9,9 +11,6 @@ namespace RSTMCPP
 	struct ADPCHeader;
 	struct RSTMDATAHeader;
 
-	/*
-	unsafe struct RSTMHeader
-	*/
 	struct RSTMHeader
 	{
 		NW4RCommonHeader _header;
@@ -44,19 +43,16 @@ namespace RSTMCPP
 			_header._length = len + dataLen;
 
 			//Fill padding
-			memset((byte*)(&_header) + 0x28, 0, 0x18);
+			memset((uint8_t*)(&_header) + 0x28, 0, 0x18);
 		}
 
-		HEADHeader* HEADData() { return (HEADHeader*)((byte*)&_header + _headOffset); }
-		ADPCHeader* ADPCData() { return (ADPCHeader*)((byte*)&_header + _adpcOffset); }
-		RSTMDATAHeader* DATAData() { return (RSTMDATAHeader*)((byte*)&_header + _dataOffset); }
+		HEADHeader* HEADData() { return (HEADHeader*)((uint8_t*)&_header + _headOffset); }
+		ADPCHeader* ADPCData() { return (ADPCHeader*)((uint8_t*)&_header + _adpcOffset); }
+		RSTMDATAHeader* DATAData() { return (RSTMDATAHeader*)((uint8_t*)&_header + _dataOffset); }
 	};
 
 	struct StrmDataInfo;
 
-	/*
-	unsafe struct HEADHeader
-	*/
 	struct HEADHeader
 	{
 		le_uint32_t _tag;
@@ -66,7 +62,7 @@ namespace RSTMCPP
 		void Set(int size, int channels)
 		{
 			RuintList* list;
-			byte* offset = _entries.Address();
+			uint8_t* offset = _entries.Address();
 			int dataOffset = 0x60 + (channels * 8);
 
 			_tag = 0x44414548;
@@ -125,9 +121,6 @@ namespace RSTMCPP
 		}
 	};
 
-	/*
-	unsafe struct StrmDataInfo
-	*/
 	struct StrmDataInfo
 	{
 		AudioFormatInfo _format;
@@ -146,9 +139,6 @@ namespace RSTMCPP
 		be_uint32_t _bitsPerSample;
 	};
 
-	/*
-	unsafe struct ADPCHeader
-	*/
 	struct ADPCHeader
 	{
 		le_uint32_t _tag;
@@ -165,9 +155,6 @@ namespace RSTMCPP
 		void* Data() { return ((uint8_t*)&_tag) + 0x10; }
 	};
 
-	/*
-	unsafe struct RSTMDATAHeader
-	*/
 	struct RSTMDATAHeader
 	{
 		le_uint32_t _tag;

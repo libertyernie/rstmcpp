@@ -6,9 +6,6 @@ using namespace RSTMCPP::endian;
 
 namespace RSTMCPP
 {
-	/*
-	public unsafe struct AudioFormatInfo
-	*/
 	struct AudioFormatInfo
 	{
 		uint8_t _encoding;
@@ -16,15 +13,12 @@ namespace RSTMCPP
 		uint8_t _channels;
 		uint8_t _sampleRate24;
 
-		AudioFormatInfo(byte encoding, byte looped, byte channels, byte unk)
+		AudioFormatInfo(uint8_t encoding, uint8_t looped, uint8_t channels, uint8_t unk)
 		{
 			_encoding = encoding; _looped = looped; _channels = channels; _sampleRate24 = unk;
 		}
 	};
 
-	/*
-	public unsafe struct ADPCMInfo
-	*/
 	struct ADPCMInfo
 	{
 		static const int Size = 0x30;
