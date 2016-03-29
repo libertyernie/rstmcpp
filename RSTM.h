@@ -1,265 +1,188 @@
-﻿using System;
-using System.Runtime.InteropServices;
+#pragma once
 
-namespace BrawlLib.SSBBTypes
+#include "ssbbcommon.h"
+#include "RWAV.h"
+
+namespace RSTMCPP
 {
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    unsafe struct RSTMHeader
-    {
-        public const uint Tag = 0x4D545352;
+	struct HEADHeader;
+	struct ADPCHeader;
+	struct RSTMDATAHeader;
 
-        public NW4RCommonHeader _header;
-        public bint _headOffset;
-        public bint _headLength;
-        public bint _adpcOffset;
-        public bint _adpcLength;
-        public bint _dataOffset;
-        public bint _dataLength;
+	/*
+	unsafe struct RSTMHeader
+	*/
+	struct RSTMHeader
+	{
+		NW4RCommonHeader _header;
+		be_int32_t _headOffset;
+		be_int32_t _headLength;
+		be_int32_t _adpcOffset;
+		be_int32_t _adpcLength;
+		be_int32_t _dataOffset;
+		be_int32_t _dataLength;
 
-        private VoidPtr Address{get{fixed(void* ptr = &this)return ptr;}}
+		void Set(int headLen, int adpcLen, int dataLen)
+		{
+			int len = 0x40;
 
-        public void Set(int headLen, int adpcLen, int dataLen)
-        {
-            int len = 0x40;
+			//Set header
+			_header._tag = 0x4D545352;
+			_header._endian = 0xFEFF;
+			_header._version = 0x100;
+			_header._firstOffset = 0x40;
+			_header._numEntries = 2;
 
-            //Set header
-            _header._tag = Tag;
-            _header.Endian = Endian.Big;
-            _header._version = 0x100;
-            _header._firstOffset = 0x40;
-            _header._numEntries = 2;
+			//Set offsets/lengths
+			_headOffset = len;
+			_headLength = headLen;
+			_adpcOffset = (len += headLen);
+			_adpcLength = adpcLen;
+			_dataOffset = (len += adpcLen);
+			_dataLength = dataLen;
 
-            //Set offsets/lengths
-            _headOffset = len;
-            _headLength = headLen;
-            _adpcOffset = (len += headLen);
-            _adpcLength = adpcLen;
-            _dataOffset = (len += adpcLen);
-            _dataLength = dataLen;
+			_header._length = len + dataLen;
 
-            _header._length = len + dataLen;
+			//Fill padding
+			memset((byte*)(&_header) + 0x28, 0, 0x18);
+		}
 
-            //Fill padding
-            Memory.Fill(Address + 0x28, 0x18, 0);
-        }
+		HEADHeader* HEADData() { return (HEADHeader*)((byte*)&_header + _headOffset); }
+		ADPCHeader* ADPCData() { return (ADPCHeader*)((byte*)&_header + _adpcOffset); }
+		RSTMDATAHeader* DATAData() { return (RSTMDATAHeader*)((byte*)&_header + _dataOffset); }
+	};
 
-        public HEADHeader* HEADData { get { return (HEADHeader*)(Address + _headOffset); } }
-        public ADPCHeader* ADPCData { get { return (ADPCHeader*)(Address + _adpcOffset); } }
-        public RSTMDATAHeader* DATAData { get { return (RSTMDATAHeader*)(Address + _dataOffset); } }
-    }
+	struct StrmDataInfo;
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    unsafe struct HEADHeader
-    {
-        public const uint Tag = 0x44414548;
+	/*
+	unsafe struct HEADHeader
+	*/
+	struct HEADHeader
+	{
+		le_uint32_t _tag;
+		be_int32_t _size;
+		RuintCollection _entries;
 
-        public uint _tag;
-        public bint _size;
-        public RuintCollection _entries;
+		void Set(int size, int channels)
+		{
+			RuintList* list;
+			byte* offset = _entries.Address();
+			int dataOffset = 0x60 + (channels * 8);
 
-        private VoidPtr Address { get { fixed (void* ptr = &this)return ptr; } }
+			_tag = 0x44414548;
+			_size = size;
 
-        public void Set(int size, int channels)
-        {
-            RuintList* list;
-            VoidPtr offset = _entries.Address;
-            int dataOffset = 0x60 + (channels * 8);
+			//Set entry offsets
+			_entries.Entries()[0] = 0x18;
+			_entries.Entries()[1] = 0x4C;
+			_entries.Entries()[2] = 0x5C;
 
-            _tag = Tag;
-            _size = size;
+			//Audio info
+			//HEADPart1* part1 = Part1;
 
-            //Set entry offsets
-            _entries.Entries[0] = 0x18;
-            _entries.Entries[1] = 0x4C;
-            _entries.Entries[2] = 0x5C;
+			//Set single channel info
+			list = Part2();
+			list->_numEntries = 1; //Number is little-endian
+			list->Entries()[0] = 0x58;
+			*(AudioFormatInfo*)list->Get(offset, 0) = AudioFormatInfo(2, 0, 1, 0);
 
-            //Audio info
-            //HEADPart1* part1 = Part1;
+			//Set adpcm infos
+			list = Part3();
+			list->_numEntries = channels; //little-endian
+			for (int i = 0; i < channels; i++)
+			{
+				//Set initial pointer
+				list->Entries()[i] = dataOffset;
 
-            //Set single channel info
-            list = Part2;
-            list->_numEntries._data = 1; //Number is little-endian
-            list->Entries[0] = 0x58;
-            *(AudioFormatInfo*)list->Get(offset, 0) = new AudioFormatInfo(2, 0, 1, 0);
+				//Set embedded pointer
+				int rx = dataOffset + 8;
+				*(ruint*)(offset + dataOffset) = ruint(rx);
+				dataOffset += 8;
 
-            //Set adpcm infos
-            list = Part3;
-            list->_numEntries._data = channels; //little-endian
-            for (int i = 0; i < channels; i++)
-            {
-                //Set initial pointer
-                list->Entries[i] = dataOffset;
+				//Set info
+				//*(ADPCMInfo*)(offset + dataOffset) = info[i];
+				dataOffset += ADPCMInfo::Size;
 
-                //Set embedded pointer
-                *(ruint*)(offset + dataOffset) = dataOffset + 8;
-                dataOffset += 8;
+				//Set padding
+				//*(short*)(offset + dataOffset) = 0;
+				//dataOffset += 2;
+			}
 
-                //Set info
-                //*(ADPCMInfo*)(offset + dataOffset) = info[i];
-                dataOffset += ADPCMInfo.Size;
+			//Fill remaining
+			int* p = (int*)(offset + dataOffset);
+			for (dataOffset += 8; dataOffset < size; dataOffset += 4)
+				*p++ = 0;
+		}
 
-                //Set padding
-                //*(short*)(offset + dataOffset) = 0;
-                //dataOffset += 2;
-            }
+		StrmDataInfo* Part1() { return (StrmDataInfo*)_entries.getPtr(0); } //Audio info
+		RuintList* Part2() { return (RuintList*)_entries.getPtr(1); } //ADPC block flags?
+		RuintList* Part3() { return (RuintList*)_entries.getPtr(2); } //ADPCMInfo array, one for each channel?
 
-            //Fill remaining
-            int* p = (int*)(offset + dataOffset);
-            for (dataOffset += 8; dataOffset < size; dataOffset += 4)
-                *p++ = 0;
-        }
+		ADPCMInfo* GetChannelInfo(int index)
+		{
+			ruint* r = (ruint*)Part3()->Get(_entries.Address(), index);
+			return (ADPCMInfo*)r->Offset(_entries.Address());
+		}
+	};
 
-        public StrmDataInfo* Part1 { get { return (StrmDataInfo*)_entries[0]; } } //Audio info
-        public RuintList* Part2 { get { return (RuintList*)_entries[1]; } } //ADPC block flags?
-        public RuintList* Part3 { get { return (RuintList*)_entries[2]; } } //ADPCMInfo array, one for each channel?
+	/*
+	unsafe struct StrmDataInfo
+	*/
+	struct StrmDataInfo
+	{
+		AudioFormatInfo _format;
+		be_uint16_t _sampleRate; //0x7D00
+		be_uint16_t _blockHeaderOffset;
+		be_uint32_t _loopStartSample;
+		be_uint32_t _numSamples;
+		be_uint32_t _dataOffset;
+		be_uint32_t _numBlocks;
+		be_uint32_t _blockSize;
+		be_uint32_t _samplesPerBlock; //0x3800
+		be_uint32_t _lastBlockSize; //Without padding
+		be_uint32_t _lastBlockSamples;
+		be_uint32_t _lastBlockTotal; //Includes padding
+		be_uint32_t _dataInterval; //0x3800
+		be_uint32_t _bitsPerSample;
+	};
 
-        public ADPCMInfo* GetChannelInfo(int index)
-        {
-            return (ADPCMInfo*)((ruint*)Part3->Get(_entries.Address, index))->Offset(_entries.Address);
-        }
+	/*
+	unsafe struct ADPCHeader
+	*/
+	struct ADPCHeader
+	{
+		le_uint32_t _tag;
+		be_int32_t _length;
+		int32_t _pad1, _pad2;
 
-        public ADPCMInfo[] ChannelInfo
-        {
-            get
-            {
-                RuintList* list = Part3;
-                VoidPtr offset = _entries.Address;
-                int count = list->_numEntries._data;
-                ADPCMInfo[] arr = new ADPCMInfo[count];
-                for (int i = 0; i < count; i++)
-                    arr[i] = *(ADPCMInfo*)((ruint*)list->Get(offset, i))->Offset(offset);
-                return arr;
-            }
-        }
-    }
+		void Set(int length)
+		{
+			_tag = 0x43504441;
+			_length = length;
+			_pad1 = _pad2 = 0;
+		}
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    unsafe struct StrmDataInfo
-    {
-        public AudioFormatInfo _format;
-        public bushort _sampleRate; //0x7D00
-        public bushort _blockHeaderOffset;
-        public bint _loopStartSample;
-        public bint _numSamples;
-        public bint _dataOffset;
-        public bint _numBlocks;
-        public bint _blockSize;
-        public bint _samplesPerBlock; //0x3800
-        public bint _lastBlockSize; //Without padding
-        public bint _lastBlockSamples;
-        public bint _lastBlockTotal; //Includes padding
-        public bint _dataInterval; //0x3800
-        public bint _bitsPerSample;
+		void* Data() { return ((uint8_t*)&_tag) + 0x10; }
+	};
 
-        public unsafe StrmDataInfo(CSTMDataInfo o, int dataOffset)
-        {
-            _format = o._format;
-            _sampleRate = checked((ushort)o._sampleRate);
-            _blockHeaderOffset = 0;
-            _loopStartSample = o._loopStartSample;
-            _numSamples = o._numSamples;
-            _dataOffset = dataOffset;
-            _numBlocks = o._numBlocks;
-            _blockSize = o._blockSize;
-            _samplesPerBlock = o._samplesPerBlock;
-            _lastBlockSize = o._lastBlockSize;
-            _lastBlockSamples = o._lastBlockSamples;
-            _lastBlockTotal = o._lastBlockTotal;
-            _dataInterval = o._dataInterval;
-            _bitsPerSample = o._bitsPerSample;
-        }
+	/*
+	unsafe struct RSTMDATAHeader
+	*/
+	struct RSTMDATAHeader
+	{
+		le_uint32_t _tag;
+		be_int32_t _length;
+		be_int32_t _dataOffset;
+		int32_t _pad1;
 
-        public unsafe StrmDataInfo(FSTMDataInfo o, int dataOffset) {
-            _format = o._format;
-            _sampleRate = checked((ushort)(int)o._sampleRate);
-            _blockHeaderOffset = 0;
-            _loopStartSample = o._loopStartSample;
-            _numSamples = o._numSamples;
-            _dataOffset = dataOffset;
-            _numBlocks = o._numBlocks;
-            _blockSize = o._blockSize;
-            _samplesPerBlock = o._samplesPerBlock;
-            _lastBlockSize = o._lastBlockSize;
-            _lastBlockSamples = o._lastBlockSamples;
-            _lastBlockTotal = o._lastBlockTotal;
-            _dataInterval = o._dataInterval;
-            _bitsPerSample = o._bitsPerSample;
-        }
+		void Set(int length)
+		{
+			_tag = 0x41544144;
+			_length = length;
+			_dataOffset = 0x18;
+			_pad1 = 0;
+		}
 
-        //public void Set(int sampleRate, int loopStart, int numSamples, int channels, int dataOffset)
-        //{
-        //    _format = new AudioFormatInfo(2, (byte)(loopStart >= 0 ? 1 : 0), (byte)channels, 0);
-        //    _sampleRate = (ushort)_sampleRate;
-        //    _unk1 = 0;
-        //    _loopStartSample = loopStart;
-        //    _numSamples = numSamples;
-        //    _dataOffset = dataOffset;
-
-        //    int tmp, lbSize;
-
-        //    _numBlocks = (numSamples + 0x37FF) / 0x3800;
-        //    if ((tmp = numSamples % 0x3800) != 0)
-        //    {
-        //        _lastBlockSamples = tmp;
-        //        lbSize = tmp / 14 * 8;
-        //        if ((tmp %= 14) != 0)
-        //            lbSize += (tmp + 1) / 2 + 1;
-        //        _lastBlockSize = lbSize;
-        //        _lastBlockTotal = (lbSize + 0x19) / 0x20;
-        //    }
-        //    else
-        //    {
-        //        _lastBlockSamples = 0x3800;
-        //        _lastBlockTotal = _lastBlockSize = 0x2000;
-        //    }
-
-        //    _blockSize = 0x2000;
-        //    _samplesPerBlock = 0x3800;
-        //    _unk8 = 0x3800;
-        //    _bitsPerSample = 4;
-        //}
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    unsafe struct ADPCHeader
-    {
-        public const uint Tag = 0x43504441;
-
-        public uint _tag;
-        public bint _length;
-        int _pad1, _pad2;
-
-        public void Set(int length)
-        {
-            _tag = Tag;
-            _length = length;
-            _pad1 = _pad2 = 0;
-        }
-
-        private VoidPtr Address { get { fixed (void* ptr = &this)return ptr; } }
-        public VoidPtr Data { get { return Address + 0x10; } }
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    unsafe struct RSTMDATAHeader
-    {
-        public const int Size = 0x20;
-        public const uint Tag = 0x41544144;
-
-        public uint _tag;
-        public bint _length;
-        public bint _dataOffset;
-        public int _pad1;
-
-        public void Set(int length)
-        {
-            _tag = Tag;
-            _length = length;
-            _dataOffset = 0x18;
-            _pad1 = 0;
-        }
-
-        private VoidPtr Address { get { fixed (void* ptr = &this)return ptr; } }
-        public VoidPtr Data { get { return Address + 8 + _dataOffset; } }
-    }
+		void* Data() { return ((uint8_t*)&_tag) + 8 + _dataOffset; }
+	};
 }

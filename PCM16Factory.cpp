@@ -1,340 +1,283 @@
-﻿using System;
-using System.Audio;
-using System.IO;
-using System.Runtime.InteropServices;
+#include <stdexcept>
+#include "endian.h"
+#include "PCM16Factory.h"
 
-namespace RSTMLib.WAV {
-    public class PCM16FactoryException : Exception {
-        public PCM16FactoryException(string message) : base(message) { }
+using namespace RSTMCPP::WAV;
+using namespace RSTMCPP::endian;
+
+// WAVEFORMATEX
+struct fmt {
+	le_uint16_t format;
+	le_int16_t channels;
+	le_int32_t sampleRate;
+	le_int32_t byteRate;
+	le_int16_t blockAlign;
+	le_int16_t bitsPerSample;
+};
+
+// GUID
+struct guid {
+	int64_t data1;
+	int32_t data2;
+	int32_t data3;
+	uint8_t data4[8];
+};
+
+bool operator==(const struct guid& a, const struct guid& b)
+{
+	return a.data1 == b.data1
+		&& a.data2 == b.data2
+		&& a.data3 == b.data3
+		&& memcmp(a.data4, b.data4, 8) == 0;
+}
+
+const struct guid KSDATAFORMAT_SUBTYPE_PCM = { 0x00000001L, 0x0000, 0x0010,{ 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+
+// WAVEFORMATEXTENSIBLE
+struct fmt_extensible {
+	struct fmt fmt;
+	union {
+		int16_t validBitsPerSample;
+		int16_t samplesPerBlock;
+		int16_t reserved;
+	} samples;
+	int32_t channelMask;
+	guid subFormat;
+};
+
+struct smpl {
+	uint32_t manufacturer;
+	uint32_t product;
+	uint32_t samplePeriod;
+	uint32_t midiUnityNote;
+	uint32_t midiPitchFraction;
+	uint32_t smpteFormat;
+	int8_t smpteOffsetHours;
+	uint8_t smpteOffsetMinutes;
+	uint8_t smpteOffsetSeconds;
+	uint8_t smpteOffsetFrames;
+	uint32_t sampleLoopCount;
+	uint32_t samplerDataCount;
+};
+
+struct smpl_loop {
+	uint32_t loopID;
+	int32_t type;
+	int32_t start;
+	int32_t end;
+	uint32_t fraction;
+	int32_t playCount;
+};
+
+PCM16Audio* PCM16Factory::FromFile(FILE* file) {
+	char buffer[12];
+	int r = fread(buffer, 1, 12, file);
+    if (r == 0) {
+		throw std::runtime_error("No data in stream");
+    } else if (r < 12) {
+		throw std::runtime_error("Unexpected end of stream in first 12 bytes");
     }
 
-    /// <summary>
-    /// Convert between RIFF WAVE format (the .wav files used by Microsoft) and this application's internal LWAV class.
-    /// Input data must have 16 bits per sample and be in one of the following formats:
-    /// * WAVE_FORMAT_PCM (0x0001)
-    /// * WAVE_FORMAT_EXTENSIBLE (0xFFFE) with a subformat of KSDATAFORMAT_SUBTYPE_PCM (00000001-0000-0010-8000-00aa00389b71)
-    /// This program will read the "fmt ", "data", and (if present) "smpl" chunks; any other chunks in the file will be ignored.
-    /// Output data will use WAVE_FORMAT_PCM and have "fmt " and "data" chunks, along with a "smpl" chunk if it is a looping track.
-    /// </summary>
-    public static class PCM16Factory {
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        private struct fmt {
-            public ushort format;
-            public short channels;
-            public int sampleRate;
-            public int byteRate;
-            public short blockAlign;
-            public short bitsPerSample;
-        }
+    if (strncmp(buffer, "RIFF", 4) != 0) {
+		throw std::runtime_error("RIFF header not found");
+    }
+	if (strncmp(buffer + 8, "WAVE", 4) != 0) {
+		throw std::runtime_error("WAVE header not found");
+    }
 
-        [StructLayout(LayoutKind.Explicit)]
-        private struct fmt_extensible {
-            [FieldOffset(0)]
-            public fmt fmt;
-            [FieldOffset(16)]
-            public short cbSize;
-            [FieldOffset(18)]
-            public short validBitsPerSample;
-            [FieldOffset(18)]
-            public short samplesPerBlock;
-            [FieldOffset(18)]
-            public short reserved;
-            [FieldOffset(20)]
-            public int channelMask;
-            [FieldOffset(24)]
-            public Guid subFormat;
-        }
+    int channels = 0;
+    int sampleRate = 0;
 
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        private struct smpl {
-            public uint manufacturer;
-            public uint product;
-            public uint samplePeriod;
-            public uint midiUnityNote;
-            public uint midiPitchFraction;
-            public uint smpteFormat;
-            public sbyte smpteOffsetHours;
-            public byte smpteOffsetMinutes;
-            public byte smpteOffsetSeconds;
-            public byte smpteOffsetFrames;
-            public uint sampleLoopCount;
-            public uint samplerDataCount;
-        }
+	int16_t* sample_data = NULL;
+	int sample_data_length_bytes = 0;
+    bool convert_from_8_bit = false;
 
-        [StructLayout(LayoutKind.Sequential, Pack = 1)]
-        private struct smpl_loop {
-            public uint loopID;
-            public int type;
-            public int start;
-            public int end;
-            public uint fraction;
-            public int playCount;
-        }
+    int loopStart = -1;
+    int loopEnd;
 
-        private static unsafe int tag(string s) {
-            if (s.Length != 4) throw new ArgumentException("String must be 4 characters long");
-            int i = 0;
-            byte* ptr = (byte*)&i;
-            ptr[0] = (byte)s[0];
-            ptr[1] = (byte)s[1];
-            ptr[2] = (byte)s[2];
-            ptr[3] = (byte)s[3];
-            return i;
-        }
+    // Keep reading chunk headers into a buffer of 8 bytes
+    while ((r = fread(buffer, 1, 8, file)) > 0) {
+        if (r < 8) {
+			throw std::runtime_error("Unexpected end of stream in chunk header");
+        } else {
+            // Four ASCII characters
+			char id[5];
+			id[4] = '\0';
+			strncpy(id, buffer, 4);
 
-        public unsafe static PCM16Audio FromAudioStream(IAudioStream source) {
-            short[] sample_data = new short[source.Samples * source.Channels];
-            fixed (short* ptr = sample_data)
-            {
-                source.ReadSamples(ptr, sample_data.Length);
-            }
-            return new PCM16Audio(
-                source.Channels,
-                source.Frequency,
-                sample_data,
-                source.IsLooping ? source.LoopStartSample : (int?)null,
-                source.IsLooping ? source.LoopEndSample : (int?)null);
-        }
+			le_int32_t* px = (le_int32_t*)(buffer + 4);
+			int32_t chunklength = *px;
 
-        /// <summary>
-        /// Reads RIFF WAVE data from a stream.
-        /// If the size of the "data" chunk is incorrect or negative, but the "data" chunk is known to be the last chunk in the file, set the assumeDataIsLastChunk parameter to true.
-        /// </summary>
-        /// <param name="stream">Stream to read from (no data will be written to the stream)</param>
-        /// <returns></returns>
-        public unsafe static PCM16Audio FromStream(Stream stream) {
-            byte[] buffer = new byte[12];
-            int r = stream.Read(buffer, 0, 12);
-            if (r == 0) {
-                throw new PCM16FactoryException("No data in stream");
-            } else if (r < 12) {
-                throw new PCM16FactoryException("Unexpected end of stream in first 12 bytes");
-            }
-            fixed (byte* bptr = buffer)
-            {
-                if (*(int*)bptr != tag("RIFF")) {
-                    throw new PCM16FactoryException("RIFF header not found");
-                }
-                if (*(int*)(bptr + 8) != tag("WAVE")) {
-                    throw new PCM16FactoryException("WAVE header not found");
+            char* buffer2;
+            if (id == "data" && chunklength == -1) {
+				throw std::runtime_error("No length specified in data chunk");
+            } else {
+                // Look at the length of the chunk and read that many bytes into a byte array.
+				buffer2 = (char*)malloc(chunklength);
+				char* end = buffer2 + chunklength;
+				char* ptr = buffer2;
+				while (ptr < end) {
+					int r = fread(ptr, 1, end - ptr, file);
+					ptr += r;
+					if (r == 0) {
+						char str[128];
+						str[127] = '\0';
+						snprintf(str, 127, "Unexpected end of data in \"%s\" chunk: expected %d bytes, got %d bytes", id, end - buffer2, end - ptr);
+						throw std::runtime_error(str);
+					}
                 }
             }
 
-            int channels = 0;
-            int sampleRate = 0;
-
-            short[] sample_data = null;
-            bool convert_from_8_bit = false;
-
-            int? loopStart = null;
-            int? loopEnd = null;
-
-            // Keep reading chunk headers into a buffer of 8 bytes
-            while ((r = stream.Read(buffer, 0, 8)) > 0) {
-                if (r < 8) {
-                    throw new PCM16FactoryException("Unexpected end of stream in chunk header");
-                } else {
-                    fixed (byte* ptr1 = buffer)
-                    {
-                        // Four ASCII characters
-                        string id = Marshal.PtrToStringAnsi((IntPtr)ptr1, 4);
-
-                        int chunklength = *(int*)(ptr1 + 4);
-
-                        byte[] buffer2;
-                        if (id == "data" && chunklength == -1) {
-                            // Special handling for streaming output of madplay.exe.
-                            // If we were using temporary files, this would not be needed, but I like a good programming challenge.
-                            using (MemoryStream ms = new MemoryStream()) {
-                                byte[] databuffer = new byte[1024 * 1024];
-                                while ((r = stream.Read(databuffer, 0, databuffer.Length)) > 0) {
-                                    ms.Write(databuffer, 0, r);
-                                }
-
-                                buffer2 = ms.ToArray();
-                            }
+            if (!strcmp(id, "fmt ")) {
+                // Format chunk
+				struct fmt* fmt = (struct fmt*)buffer2;
+                if (fmt->format != 1) {
+                    if (fmt->format == 65534) {
+                        // WAVEFORMATEXTENSIBLE
+                        fmt_extensible* ext = (fmt_extensible*)fmt;
+                        if (ext->subFormat == KSDATAFORMAT_SUBTYPE_PCM) {
+                            // KSDATAFORMAT_SUBTYPE_PCM
                         } else {
-                            // Look at the length of the chunk and read that many bytes into a byte array.
-                            buffer2 = new byte[chunklength];
-                            int total = 0;
-                            while (total < buffer2.Length) {
-                                total += (r = stream.Read(buffer2, total, buffer2.Length - total));
-                                if (r == 0) throw new PCM16FactoryException("Unexpected end of data in \"" + Marshal.PtrToStringAnsi((IntPtr)ptr1, 4) + "\" chunk: expected " + buffer2.Length + " bytes, got " + total + " bytes");
-                            }
+                            throw std::runtime_error("Only uncompressed PCM suppported - found WAVEFORMATEXTENSIBLE with unsupported subformat");
                         }
-
-                        fixed (byte* ptr2 = buffer2)
-                        {
-                            if (id == "fmt ") {
-                                // Format chunk
-                                fmt* fmt = (fmt*)ptr2;
-                                if (fmt->format != 1) {
-                                    if (fmt->format == 65534) {
-                                        // WAVEFORMATEXTENSIBLE
-                                        fmt_extensible* ext = (fmt_extensible*)fmt;
-                                        if (ext->subFormat == new Guid("00000001-0000-0010-8000-00aa00389b71")) {
-                                            // KSDATAFORMAT_SUBTYPE_PCM
-                                        } else {
-                                            throw new PCM16FactoryException("Only uncompressed PCM suppported - found WAVEFORMATEXTENSIBLE with subformat " + ext->subFormat);
-                                        }
-                                    } else {
-                                        throw new PCM16FactoryException("Only uncompressed PCM suppported - found format " + fmt->format);
-                                    }
-                                } else if (fmt->bitsPerSample != 16) {
-                                    if (fmt->bitsPerSample == 8) {
-                                        convert_from_8_bit = true;
-                                    } else {
-                                        throw new PCM16FactoryException("Only 16-bit wave files supported");
-                                    }
-                                }
-
-                                channels = fmt->channels;
-                                sampleRate = fmt->sampleRate;
-                            } else if (id == "data") {
-                                // Data chunk - contains samples
-                                sample_data = new short[buffer2.Length / 2];
-                                Marshal.Copy((IntPtr)ptr2, sample_data, 0, sample_data.Length);
-                            } else if (id == "smpl") {
-                                // sampler chunk
-                                smpl* smpl = (smpl*)ptr2;
-                                if (smpl->sampleLoopCount > 1) {
-                                    throw new PCM16FactoryException("Cannot read looping .wav file with more than one loop");
-                                } else if (smpl->sampleLoopCount == 1) {
-                                    // There is one loop - we only care about start and end points
-                                    smpl_loop* loop = (smpl_loop*)(smpl + 1);
-                                    if (loop->type != 0) {
-                                        throw new PCM16FactoryException("Cannot read looping .wav file with loop of type " + loop->type);
-                                    }
-                                    loopStart = loop->start;
-                                    loopEnd = loop->end;
-                                }
-                            } else {
-                                Console.Error.WriteLine("Ignoring unknown chunk " + id);
-                            }
-                        }
+                    } else {
+                        throw std::runtime_error("Only uncompressed PCM suppported - found unknown format");
+                    }
+                } else if (fmt->bitsPerSample != 16) {
+					le_int16_t aa = fmt->bitsPerSample;
+					int16_t ab = aa;
+                    if (fmt->bitsPerSample == 8) {
+                        convert_from_8_bit = true;
+                    } else {
+                        throw std::runtime_error("Only 8-bit and 16-bit wave files supported");
                     }
                 }
-            }
 
-            if (sampleRate == 0) {
-                throw new PCM16FactoryException("Format chunk not found");
-            }
-            if (sample_data == null) {
-                throw new PCM16FactoryException("Data chunk not found");
-            }
-
-            if (convert_from_8_bit) {
-                short[] new_sample_data = new short[sample_data.Length * 2];
-                fixed (short* short_ptr = sample_data)
-                {
-                    byte* ptr = (byte*)short_ptr;
-                    for (int i = 0; i < new_sample_data.Length; i++) {
-                        new_sample_data[i] = (short)((ptr[i] - 0x80) << 8);
+                channels = fmt->channels;
+                sampleRate = fmt->sampleRate;
+            } else if (!strcmp(id, "data")) {
+                // Data chunk - contains samples
+				if (sample_data != NULL) {
+					throw std::runtime_error("Multiple data chunks found");
+				}
+				sample_data = (int16_t*)buffer2;
+				sample_data_length_bytes = chunklength;
+            } else if (!strcmp(id, "smpl")) {
+                // sampler chunk
+                struct smpl* smpl = (struct smpl*)buffer2;
+                if (smpl->sampleLoopCount > 1) {
+                    throw std::runtime_error("Cannot read looping .wav file with more than one loop");
+                } else if (smpl->sampleLoopCount == 1) {
+                    // There is one loop - we only care about start and end points
+                    smpl_loop* loop = (smpl_loop*)(smpl + 1);
+                    if (loop->type != 0) {
+                        throw std::runtime_error("Cannot read looping .wav file with loop of type other than 0");
                     }
+                    loopStart = loop->start;
+                    loopEnd = loop->end;
                 }
-                sample_data = new_sample_data;
+            } else {
+                //Console.Error.WriteLine("Ignoring unknown chunk " + id);
             }
 
-            PCM16Audio wav = new PCM16Audio(channels, sampleRate, sample_data, loopStart, loopEnd);
-            return wav;
-        }
-
-        /// <summary>
-        /// Reads RIFF WAVE data from a byte array.
-        /// This method wraps a read-only MemoryStream around the byte array and sends the stream to the FromStream method.
-        /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
-        public static PCM16Audio FromByteArray(byte[] p) {
-            using (MemoryStream stream = new MemoryStream(p, false)) {
-                return FromStream(stream);
-            }
-        }
-
-        /// <summary>
-        /// Reads RIFF WAVE data from a file.
-        /// This method opens a read-only FileStream and sends the stream to the FromStream method.
-        /// </summary>
-        /// <param name="filename"></param>
-        /// <param name="delete">Whether to try to delete the file afterwards (no exception will be thrown if unsuccessful)</param>
-        /// <returns></returns>
-        public static PCM16Audio FromFile(string filename, bool delete) {
-            PCM16Audio w;
-            using (FileStream stream = new FileStream(filename, FileMode.Open, FileAccess.Read)) {
-                w = FromStream(stream);
-            }
-            if (delete) try {
-                    File.Delete(filename);
-                } catch { }
-            return w;
-        }
-
-        /// <summary>
-        /// Exports data to a byte array in RIFF WAVE (.wav) format.
-        /// Output data will use WAVE_FORMAT_PCM and have "fmt " and "data" chunks, along with a "smpl" chunk if it is a looping track.
-        /// Note that even files with more than 2 channels will use WAVE_FORMAT_PCM as the format, even though doing this is invalid according to the spec.
-        /// </summary>
-        /// <param name="lwav"></param>
-        /// <returns></returns>
-        public static unsafe byte[] Export(this PCM16Audio lwav) {
-            int length = 12 + 8 + sizeof(fmt) + 8 + (lwav.Samples.Length * 2);
-            if (lwav.Looping) {
-                length += 8 + sizeof(smpl) + sizeof(smpl_loop);
-            }
-            byte[] data = new byte[length];
-            fixed (byte* start = data)
-            {
-                byte* ptr = start;
-                *(int*)ptr = tag("RIFF");
-                ptr += 4;
-                *(int*)ptr = length - 8;
-                ptr += 4;
-                *(int*)ptr = tag("WAVE");
-                ptr += 4;
-
-                *(int*)ptr = tag("fmt ");
-                ptr += 4;
-                *(int*)ptr = sizeof(fmt);
-                ptr += 4;
-
-                fmt* fmt = (fmt*)ptr;
-                fmt->format = 1;
-                fmt->channels = lwav.Channels;
-                fmt->sampleRate = lwav.SampleRate;
-                fmt->byteRate = lwav.SampleRate * lwav.Channels * 2;
-                fmt->blockAlign = (short)(lwav.Channels * 2);
-                fmt->bitsPerSample = 16;
-                ptr += sizeof(fmt);
-
-                *(int*)ptr = tag("data");
-                ptr += 4;
-                *(int*)ptr = lwav.Samples.Length * 2;
-                ptr += 4;
-
-                Marshal.Copy(lwav.Samples, 0, (IntPtr)ptr, lwav.Samples.Length);
-                ptr += lwav.Samples.Length * 2;
-
-                if (lwav.Looping) {
-                    *(int*)ptr = tag("smpl");
-                    ptr += 4;
-                    *(int*)ptr = sizeof(smpl) + sizeof(smpl_loop);
-                    ptr += 4;
-
-                    smpl* smpl = (smpl*)ptr;
-                    smpl->sampleLoopCount = 1;
-                    ptr += sizeof(smpl);
-
-                    smpl_loop* loop = (smpl_loop*)ptr;
-                    loop->loopID = 0;
-                    loop->type = 0;
-                    loop->start = lwav.LoopStart;
-                    loop->end = lwav.LoopEnd;
-                    loop->fraction = 0;
-                    loop->playCount = 0;
-                    ptr += sizeof(smpl_loop);
-                }
-                return data;
-            }
+			if ((void*)buffer2 != (void*)sample_data) {
+				free(buffer2);
+			}
         }
     }
+
+    if (sampleRate == 0) {
+        throw std::runtime_error("Format chunk not found");
+    }
+    if (sample_data == NULL) {
+        throw std::runtime_error("Data chunk not found");
+    }
+
+    if (convert_from_8_bit) {
+        int16_t* new_sample_data = (int16_t*)malloc(sample_data_length_bytes * 2);
+        uint8_t* ptr = (uint8_t*)sample_data;
+        for (int i = 0; i < sample_data_length_bytes * 2; i++) {
+            new_sample_data[i] = (int16_t)((ptr[i] - 0x80) << 8);
+        }
+
+		free(sample_data);
+        sample_data = new_sample_data;
+		sample_data_length_bytes *= 2;
+    }
+
+    PCM16Audio* wav = new PCM16Audio(channels, sampleRate, sample_data, sample_data_length_bytes / 2, loopStart, loopEnd);
+
+	free(sample_data);
+    return wav;
+}
+
+int PCM16Factory::exportWavSize(const PCM16Audio* lwav) {
+	int length = 12 + 8 + sizeof(fmt) + 8 + ((lwav->samples_end - lwav->samples) * 2);
+	if (lwav->looping) {
+		length += 8 + sizeof(smpl) + sizeof(smpl_loop);
+	}
+	return length;
+}
+
+void PCM16Factory::exportWav(const PCM16Audio* lwav, void* dest, int size) {
+	char* ptr = (char*)dest;
+	*(ptr++) = 'R';
+	*(ptr++) = 'I';
+	*(ptr++) = 'F';
+	*(ptr++) = 'F';
+	*(int32_t*)ptr = size - 8;
+	ptr += 4;
+	*(ptr++) = 'W';
+	*(ptr++) = 'A';
+	*(ptr++) = 'V';
+	*(ptr++) = 'E';
+
+	*(ptr++) = 'f';
+	*(ptr++) = 'm';
+	*(ptr++) = 't';
+	*(ptr++) = ' ';
+	*(int32_t*)ptr = sizeof(fmt);
+	ptr += 4;
+
+	struct fmt* fmt = (struct fmt*)ptr;
+	fmt->format = 1;
+	fmt->channels = lwav->channels;
+	fmt->sampleRate = lwav->sampleRate;
+	fmt->byteRate = lwav->sampleRate * lwav->channels * 2;
+	fmt->blockAlign = (int16_t)(lwav->channels * 2);
+	fmt->bitsPerSample = 16;
+	ptr += sizeof(struct fmt);
+
+	*(ptr++) = 'd';
+	*(ptr++) = 'a';
+	*(ptr++) = 't';
+	*(ptr++) = 'a';
+	int32_t samplesLength = (lwav->samples_end - lwav->samples) * 2;
+	*(int32_t*)ptr = samplesLength;
+	ptr += 4;
+
+	memcpy(ptr, lwav->samples, samplesLength);
+	ptr += samplesLength;
+
+	if (lwav->looping) {
+		*(ptr++) = 's';
+		*(ptr++) = 'm';
+		*(ptr++) = 'p';
+		*(ptr++) = 'l';
+		*(int*)ptr = sizeof(struct smpl) + sizeof(struct smpl_loop);
+		ptr += 4;
+
+		struct smpl* smpl = (struct smpl*)ptr;
+		smpl->sampleLoopCount = 1;
+		ptr += sizeof(struct smpl);
+
+		struct smpl_loop* loop = (struct smpl_loop*)ptr;
+		loop->loopID = 0;
+		loop->type = 0;
+		loop->start = (lwav->loop_start - lwav->samples) / lwav->channels;
+		loop->end = (lwav->loop_end - lwav->samples) / lwav->channels;
+		loop->fraction = 0;
+		loop->playCount = 0;
+		ptr += sizeof(struct smpl_loop);
+	}
 }

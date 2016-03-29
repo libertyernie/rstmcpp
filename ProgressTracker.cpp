@@ -1,46 +1,41 @@
-﻿using System;
-using System.Text;
-using System.Windows.Forms;
+#include "ProgressTracker.h"
+#include <iostream>
 
-namespace stm_encode {
-    public class ConsoleProgressTracker : IProgressTracker {
-        public bool Cancelled { get; set; }
+using std::cout;
+using std::endl;
 
-        public float CurrentValue { get; set; }
+RSTMCPP::ProgressTracker::ProgressTracker() {
+	this->cancelled = false;
+}
 
-        public float MaxValue { get; set; }
+/*
+		public void Begin(float min, float max, float current) {
+*/
+void RSTMCPP::ProgressTracker::begin(float min, float max, float current) {
+	this->minValue = min;
+	this->maxValue = max;
+	this->currentValue = current;
+	cout << "\r[";
+	for (int i = 0; i < 77; i++) cout << ' ';
+	cout << ']';
+	cout.flush();
+}
 
-        public float MinValue { get; set; }
+void RSTMCPP::ProgressTracker::cancel() {
+	this->cancelled = true;
+	cout << endl;
+}
 
-        public void Begin(float min, float max, float current) {
-            MinValue = min;
-            MaxValue = max;
-            Console.Write('\r');
-            Console.Write('[');
-            for (int i = 0; i < Console.WindowWidth - 3; i++) Console.Write(' ');
-            Console.Write(']');
-            Update(current);
-        }
+void RSTMCPP::ProgressTracker::finish() {
+	cout << endl;
+}
 
-        public void Cancel() {
-            Cancelled = true;
-            Console.WriteLine();
-        }
+void RSTMCPP::ProgressTracker::update(float value) {
+	if (this->cancelled) return;
+	this->currentValue = value;
 
-        public void Finish() {
-            Console.WriteLine();
-        }
-
-        public void Update(float value) {
-            if (Cancelled) return;
-            CurrentValue = value;
-
-            StringBuilder sb = new StringBuilder("\r[");
-            Console.Write('\r');
-            Console.Write('[');
-            float width = (Console.WindowWidth - 3) * Math.Min(CurrentValue / MaxValue, 1);
-            for (int i = 0; i < width; i++) sb.Append('#');
-            Console.Write(sb);
-        }
-    }
+	cout << "\r[";
+	float width = (80 - 3) * this->currentValue / this->maxValue;
+	for (int i = 0; i < width; i++) cout << '#';
+	cout.flush();
 }
