@@ -1,12 +1,19 @@
 #include "RSTMConverter.h"
-#include "AudioConverter.h"
+#include "grok.h"
 #include "RSTM.h"
 #include <cstdlib>
 #include <vector>
 
 using std::malloc;
 using std::vector;
-using namespace RSTMCPP::AudioConverter;
+
+void EncodeBlock(int16_t* source, int samples, uint8_t* dest, int16_t* coefs) {
+	for (int i = 0; i < samples; i += 14, source += 14, dest += 8) {
+		int s = samples - i;
+		if (s > 14) s = 14;
+		DSPEncodeFrame(source, s, dest, coefs);
+	}
+}
 
 void* RSTMCPP::RSTMConverter::Encode(WAV::PCM16Audio* stream, ProgressTracker* progress, int* sizeOut) {
 	int tmp;
@@ -139,8 +146,11 @@ void* RSTMCPP::RSTMConverter::Encode(WAV::PCM16Audio* stream, ProgressTracker* p
 	free(sampleBuffer);
 
 	//Calculate coefs
-	for (int i = 0; i < channels; i++)
-		AudioConverter::CalcCoefs(channelBuffers[i] + 2, totalSamples, (int16_t*)pAdpcm[i], progress);
+	for (int i = 0; i < channels; i++) {
+		DSPCorrelateCoefs(channelBuffers[i] + 2, totalSamples, (int16_t*)pAdpcm[i]);
+		if (progress)
+			progress->update(progress->currentValue + totalSamples);
+	}
 
 	//Encode blocks
 	uint8_t* dPtr = (uint8_t*)data->Data();
@@ -161,7 +171,7 @@ void* RSTMCPP::RSTMConverter::Encode(WAV::PCM16Audio* stream, ProgressTracker* p
 			}
 
 			//Encode block (include yn in sPtr)
-			AudioConverter::EncodeBlock(sPtr, blockSamples, dPtr, (int16_t*)pAdpcm[x]);
+			EncodeBlock(sPtr, blockSamples, dPtr, (int16_t*)pAdpcm[x]);
 
 			//Set initial ps
 			if (bIndex == 1)

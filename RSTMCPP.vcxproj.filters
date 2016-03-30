@@ -33,13 +33,13 @@
     <ClInclude Include="RWAV.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="AudioConverter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="PCM16Factory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ssbbcommon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="grok.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -56,13 +56,13 @@
     <ClCompile Include="RSTMConverter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="AudioConverter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="PCM16Factory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="endian.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gc-dspadpcm-encode\grok.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

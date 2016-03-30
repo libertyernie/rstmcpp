@@ -6,5 +6,5 @@ handling from LoopingAudioConverter, to C++.
 
 Should compile and run in Visual Studio 2015 and g++ 5.3.0.
 
-Also see (may use this in the future): 
-https://github.com/jackoalan/gc-dspadpcm-encode
+Uses the DSP encoder from https://github.com/jackoalan/gc-dspadpcm-encode,
+which was (at least partially) based on the one in BrawlLib.
