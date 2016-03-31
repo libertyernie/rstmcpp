@@ -7,6 +7,6 @@
 
 namespace rstmcpp {
 	namespace encoder {
-		RSTMHeader* EncodeRSTM(pcm16::PCM16* stream, ProgressTracker* progress, int* sizeOut);
+		RSTMHeader* encode_rstm(pcm16::PCM16* stream, ProgressTracker* progress, int* sizeOut);
 	}
 }

@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
 
 	if (!strcmp("RIFF", tag)) {
 		try {
-			PCM16* wav = wavfactory::FromFile(inFile);
+			PCM16* wav = wavfactory::from_file(inFile);
 			if (forceNoLoop) wav->looping = false;
 			if (forceLoop) wav->looping = true;
 			wav->loop_start = (wav->samples + loopStart * wav->channels);
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
 
 			ProgressTracker progress;
 			int size;
-			char* rstm = (char*)encoder::EncodeRSTM(wav, &progress, &size);
+			char* rstm = (char*)encoder::encode_rstm(wav, &progress, &size);
 			delete wav;
 			while (size > 0) {
 				int r = fwrite(rstm, 1, size, outFile);

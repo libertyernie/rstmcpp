@@ -19,7 +19,7 @@ void EncodeBlock(int16_t* source, int samples, uint8_t* dest, int16_t* coefs) {
 	}
 }
 
-RSTMHeader* encoder::EncodeRSTM(PCM16* stream, ProgressTracker* progress, int* sizeOut) {
+RSTMHeader* encoder::encode_rstm(PCM16* stream, ProgressTracker* progress, int* sizeOut) {
 	int tmp;
 	bool looped = stream->looping;
 	int channels = stream->channels;

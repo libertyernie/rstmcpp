@@ -70,7 +70,7 @@ struct smpl_loop {
 	int32_t playCount;
 };
 
-PCM16* wavfactory::FromFile(FILE* file) {
+PCM16* wavfactory::from_file(FILE* file) {
 	char buffer[12];
 	int r = fread(buffer, 1, 12, file);
     if (r == 0) {
@@ -212,7 +212,7 @@ PCM16* wavfactory::FromFile(FILE* file) {
     return wav;
 }
 
-int wavfactory::exportWavSize(const PCM16* lwav) {
+int wavfactory::get_size(const PCM16* lwav) {
 	int length = 12 + 8 + sizeof(fmt) + 8 + ((lwav->samples_end - lwav->samples) * 2);
 	if (lwav->looping) {
 		length += 8 + sizeof(smpl) + sizeof(smpl_loop);
@@ -220,7 +220,7 @@ int wavfactory::exportWavSize(const PCM16* lwav) {
 	return length;
 }
 
-void wavfactory::exportWav(const PCM16* lwav, void* dest, int size) {
+void wavfactory::export_to_ptr(const PCM16* lwav, void* dest, int size) {
 	char* ptr = (char*)dest;
 	*(ptr++) = 'R';
 	*(ptr++) = 'I';

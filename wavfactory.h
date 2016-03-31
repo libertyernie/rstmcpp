@@ -5,10 +5,10 @@
 namespace rstmcpp {
 	namespace pcm16 {
 		namespace wavfactory {
-			PCM16* FromFile(FILE* file);
+			PCM16* from_file(FILE* file);
 
-			int exportWavSize(const PCM16* lwav);
-			void exportWav(const PCM16* lwav, void* dest, int size);
+			int get_size(const PCM16* lwav);
+			void export_to_ptr(const PCM16* lwav, void* dest, int size);
 		}
 	}
 }

@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <cstdlib>
+#include <cstring>
 #include "pcm16.h"
 
 using std::memcpy;
