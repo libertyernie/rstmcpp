@@ -47,27 +47,27 @@ struct fmt_extensible {
 };
 
 struct smpl {
-	uint32_t manufacturer;
-	uint32_t product;
-	uint32_t samplePeriod;
-	uint32_t midiUnityNote;
-	uint32_t midiPitchFraction;
-	uint32_t smpteFormat;
+	le_uint32_t manufacturer;
+	le_uint32_t product;
+	le_uint32_t samplePeriod;
+	le_uint32_t midiUnityNote;
+	le_uint32_t midiPitchFraction;
+	le_uint32_t smpteFormat;
 	int8_t smpteOffsetHours;
 	uint8_t smpteOffsetMinutes;
 	uint8_t smpteOffsetSeconds;
 	uint8_t smpteOffsetFrames;
-	uint32_t sampleLoopCount;
-	uint32_t samplerDataCount;
+	le_uint32_t sampleLoopCount;
+	le_uint32_t samplerDataCount;
 };
 
 struct smpl_loop {
-	uint32_t loopID;
-	int32_t type;
-	int32_t start;
-	int32_t end;
-	uint32_t fraction;
-	int32_t playCount;
+	le_uint32_t loopID;
+	le_int32_t type;
+	le_int32_t start;
+	le_int32_t end;
+	le_uint32_t fraction;
+	le_int32_t playCount;
 };
 
 PCM16* wavfactory::from_file(FILE* file) {
@@ -89,7 +89,7 @@ PCM16* wavfactory::from_file(FILE* file) {
     int channels = 0;
     int sampleRate = 0;
 
-	int16_t* sample_data = NULL;
+	le_int16_t* sample_data = NULL;
 	int sample_data_length_bytes = 0;
     bool convert_from_8_bit = false;
 
@@ -114,6 +114,7 @@ PCM16* wavfactory::from_file(FILE* file) {
 				throw std::runtime_error("No length specified in data chunk");
             } else {
                 // Look at the length of the chunk and read that many bytes into a byte array.
+				printf("chunklength: %d\n", chunklength);
 				buffer2 = (char*)malloc(chunklength);
 				char* end = buffer2 + chunklength;
 				char* ptr = buffer2;
@@ -161,7 +162,7 @@ PCM16* wavfactory::from_file(FILE* file) {
 				if (sample_data != NULL) {
 					throw std::runtime_error("Multiple data chunks found");
 				}
-				sample_data = (int16_t*)buffer2;
+				sample_data = (le_int16_t*)buffer2;
 				sample_data_length_bytes = chunklength;
             } else if (!strcmp(id, "smpl")) {
                 // sampler chunk
@@ -195,10 +196,10 @@ PCM16* wavfactory::from_file(FILE* file) {
     }
 
     if (convert_from_8_bit) {
-        int16_t* new_sample_data = (int16_t*)malloc(sample_data_length_bytes * 2);
+        le_int16_t* new_sample_data = (le_int16_t*)malloc(sample_data_length_bytes * 2);
         uint8_t* ptr = (uint8_t*)sample_data;
         for (int i = 0; i < sample_data_length_bytes * 2; i++) {
-            new_sample_data[i] = (int16_t)((ptr[i] - 0x80) << 8);
+            new_sample_data[i] = (le_int16_t)((ptr[i] - 0x80) << 8);
         }
 
 		free(sample_data);
@@ -206,9 +207,15 @@ PCM16* wavfactory::from_file(FILE* file) {
 		sample_data_length_bytes *= 2;
     }
 
-    PCM16* wav = new PCM16(channels, sampleRate, sample_data, sample_data_length_bytes / 2, loopStart, loopEnd);
-
+	int16_t* sample_data_native = sample_data_native = (int16_t*)malloc(sample_data_length_bytes);
+	for (int i = 0; i < sample_data_length_bytes / 2; i++) {
+		sample_data_native[i] = sample_data[i];
+	}
 	free(sample_data);
+
+    PCM16* wav = new PCM16(channels, sampleRate, sample_data_native, sample_data_length_bytes / 2, loopStart, loopEnd);
+
+	free(sample_data_native);
     return wav;
 }
 

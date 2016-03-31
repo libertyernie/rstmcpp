@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 #include "pcm16.h"
+#include "endian.h"
 
 using std::memcpy;
 using namespace rstmcpp::pcm16;
@@ -19,17 +20,18 @@ void PCM16::initWav(int channels, int sampleRate, int16_t* sample_data, int samp
 	this->channels = channels;
 	this->sampleRate = sampleRate;
 
-	this->samples = (le_int16_t*)malloc(sizeof(le_int16_t) * sample_count);
+	this->samples = (int16_t*)malloc(sizeof(int16_t) * sample_count);
 	this->samples_pos = this->samples;
 	this->samples_end = this->samples + sample_count;
 	memcpy(this->samples, sample_data, sample_count * sizeof(int16_t));
-	int16_t xx = this->samples_end[-1];
 
 	if (loop_start < 0) {
 		this->looping = false;
 		this->loop_start = this->samples;
 		this->loop_end = this->samples_end;
 	} else {
+		printf("loop_start = %d\n", loop_start);
+		printf("loop_end = %d\n", loop_end);
 		this->looping = true;
 		this->loop_start = this->samples + this->channels * loop_start;
 		this->loop_end = this->samples + this->channels * loop_end;
