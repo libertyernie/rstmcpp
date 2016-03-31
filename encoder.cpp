@@ -199,12 +199,13 @@ RSTMHeader* encoder::encode_rstm(PCM16* stream, ProgressTracker* progress, int* 
 		}
 	}
 
-	//Reverse coefs
+	//Reverse coefs, if necessary
 	for (int i = 0; i < channels; i++)
 	{
-		int16_t* p = (int16_t*)pAdpcm[i]->_coefs;
-		for (int x = 0; x < 16; x++, p++)
-			*p = swap16(*p);
+		int16_t* from = (int16_t*)pAdpcm[i]->_coefs;
+		be_int16_t* to = (be_int16_t*)from;
+		for (int x = 0; x < 16; x++)
+			*to++ = *from++;
 	}
 
 	//Write loop states

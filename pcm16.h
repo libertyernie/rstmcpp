@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include "endian.h"
 
 namespace rstmcpp {
 	namespace pcm16 {
@@ -8,13 +8,13 @@ namespace rstmcpp {
 		public:
 			int channels;
 			int sampleRate;
-			int16_t* samples;
-			int16_t* samples_pos;
-			int16_t* samples_end;
+			rstmcpp::endian::le_int16_t* samples;
+			rstmcpp::endian::le_int16_t* samples_pos;
+			rstmcpp::endian::le_int16_t* samples_end;
 
 			bool looping;
-			int16_t* loop_start;
-			int16_t* loop_end;
+			rstmcpp::endian::le_int16_t* loop_start;
+			rstmcpp::endian::le_int16_t* loop_end;
 
 			PCM16(int channels, int sampleRate, int16_t* sample_data, int sample_count);
 			PCM16(int channels, int sampleRate, int16_t* sample_data, int sample_count, int loop_start, int loop_end);

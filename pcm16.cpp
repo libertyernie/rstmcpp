@@ -5,6 +5,7 @@
 
 using std::memcpy;
 using namespace rstmcpp::pcm16;
+using namespace rstmcpp::endian;
 
 void PCM16::initWav(int channels, int sampleRate, int16_t* sample_data, int sample_count, int loop_start, int loop_end) {
 	if (channels > 65535) throw std::invalid_argument("Streams of more than 65535 channels not supported");
@@ -18,7 +19,7 @@ void PCM16::initWav(int channels, int sampleRate, int16_t* sample_data, int samp
 	this->channels = channels;
 	this->sampleRate = sampleRate;
 
-	this->samples = (int16_t*)malloc(sizeof(int16_t) * sample_count);
+	this->samples = (le_int16_t*)malloc(sizeof(le_int16_t) * sample_count);
 	this->samples_pos = this->samples;
 	this->samples_end = this->samples + sample_count;
 	memcpy(this->samples, sample_data, sample_count * sizeof(int16_t));
