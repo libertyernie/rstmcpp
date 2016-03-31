@@ -30,8 +30,6 @@ void PCM16::initWav(int channels, int sampleRate, int16_t* sample_data, int samp
 		this->loop_start = this->samples;
 		this->loop_end = this->samples_end;
 	} else {
-		printf("loop_start = %d\n", loop_start);
-		printf("loop_end = %d\n", loop_end);
 		this->looping = true;
 		this->loop_start = this->samples + this->channels * loop_start;
 		this->loop_end = this->samples + this->channels * loop_end;

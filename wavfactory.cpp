@@ -114,7 +114,6 @@ PCM16* wavfactory::from_file(FILE* file) {
 				throw std::runtime_error("No length specified in data chunk");
             } else {
                 // Look at the length of the chunk and read that many bytes into a byte array.
-				printf("chunklength: %d\n", chunklength);
 				buffer2 = (char*)malloc(chunklength);
 				char* end = buffer2 + chunklength;
 				char* ptr = buffer2;

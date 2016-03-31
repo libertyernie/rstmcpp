@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
 
 	bool forceLoop = false;
 	bool forceNoLoop = false;
-	int loopStart, loopEnd;
+	int loopStart = 0, loopEnd = 0;
 	const char* inputFile = NULL;
 	const char* outputFile = NULL;
 
@@ -128,9 +128,15 @@ int main(int argc, char** argv) {
 		try {
 			PCM16* wav = wavfactory::from_file(inFile);
 			if (forceNoLoop) wav->looping = false;
-			if (forceLoop) wav->looping = true;
-			wav->loop_start = (wav->samples + loopStart * wav->channels);
-			wav->loop_end = (wav->samples + loopEnd * wav->channels);
+			if (forceLoop) {
+				wav->looping = true;
+				wav->loop_start = (wav->samples + loopStart * wav->channels);
+				if (loopEnd == 0) {
+					wav->loop_end = wav->samples_end;
+				} else {
+					wav->loop_end = (wav->samples + loopEnd * wav->channels);
+				}
+			}
 
 			ProgressTracker progress;
 			int size;

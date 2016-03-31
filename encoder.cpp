@@ -32,7 +32,7 @@ RSTMHeader* encoder::encode_rstm(PCM16* stream, ProgressTracker* progress, int* 
 
 	if (looped)
 	{
-		loopStart = (stream->samples_end - stream->loop_start) / stream->channels;
+		loopStart = (stream->loop_start - stream->samples) / stream->channels;
 		samples = (stream->loop_end - stream->samples) / stream->channels; //Set sample size to end sample. That way the audio gets cut off when encoding.
 
 		//If loop point doesn't land on a block, pad the stream so that it does.
