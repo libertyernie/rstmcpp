@@ -83,20 +83,19 @@
     <ClCompile Include="endian.cpp" />
     <ClCompile Include="gc-dspadpcm-encode\grok.c" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="PCM16.cpp" />
-    <ClCompile Include="PCM16Factory.cpp" />
-    <ClCompile Include="ProgressTracker.cpp" />
-    <ClCompile Include="RSTMConverter.cpp" />
+    <ClCompile Include="pcm16.cpp" />
+    <ClCompile Include="wavfactory.cpp" />
+    <ClCompile Include="progresstracker.cpp" />
+    <ClCompile Include="encoder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="endian.h" />
     <ClInclude Include="grok.h" />
-    <ClInclude Include="PCM16.h" />
-    <ClInclude Include="PCM16Factory.h" />
-    <ClInclude Include="ProgressTracker.h" />
-    <ClInclude Include="RSTM.h" />
-    <ClInclude Include="RSTMConverter.h" />
-    <ClInclude Include="RWAV.h" />
+    <ClInclude Include="pcm16.h" />
+    <ClInclude Include="wavfactory.h" />
+    <ClInclude Include="progresstracker.h" />
+    <ClInclude Include="rstm.h" />
+    <ClInclude Include="encoder.h" />
     <ClInclude Include="ssbbcommon.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

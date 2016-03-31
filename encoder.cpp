@@ -1,11 +1,15 @@
-#include "RSTMConverter.h"
+#include "encoder.h"
+#include "pcm16.h"
+#include "rstm.h"
 #include "grok.h"
-#include "RSTM.h"
 #include <cstdlib>
 #include <vector>
 
 using std::malloc;
 using std::vector;
+
+using namespace rstmcpp;
+using namespace rstmcpp::pcm16;
 
 void EncodeBlock(int16_t* source, int samples, uint8_t* dest, int16_t* coefs) {
 	for (int i = 0; i < samples; i += 14, source += 14, dest += 8) {
@@ -15,7 +19,7 @@ void EncodeBlock(int16_t* source, int samples, uint8_t* dest, int16_t* coefs) {
 	}
 }
 
-void* RSTMCPP::RSTMConverter::Encode(WAV::PCM16Audio* stream, ProgressTracker* progress, int* sizeOut) {
+RSTMHeader* encoder::EncodeRSTM(PCM16* stream, ProgressTracker* progress, int* sizeOut) {
 	int tmp;
 	bool looped = stream->looping;
 	int channels = stream->channels;
@@ -229,5 +233,5 @@ void* RSTMCPP::RSTMConverter::Encode(WAV::PCM16Audio* stream, ProgressTracker* p
 	if (progress != nullptr)
 		progress->finish();
 
-	return address;
+	return rstm;
 }

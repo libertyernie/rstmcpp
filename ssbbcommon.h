@@ -1,8 +1,8 @@
 ﻿#include "endian.h"
 
-using namespace RSTMCPP::endian;
+using namespace rstmcpp::endian;
 
-namespace RSTMCPP
+namespace rstmcpp
 {
 	struct NW4RCommonHeader
 	{

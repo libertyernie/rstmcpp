@@ -15,25 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="RSTMConverter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="PCM16.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ProgressTracker.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="endian.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="RSTM.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="RWAV.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="PCM16Factory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ssbbcommon.h">
@@ -42,27 +24,42 @@
     <ClInclude Include="grok.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="pcm16.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="wavfactory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rstm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="progresstracker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="encoder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="PCM16.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ProgressTracker.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="RSTMConverter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="PCM16Factory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="endian.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="gc-dspadpcm-encode\grok.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="encoder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pcm16.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="wavfactory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="progresstracker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

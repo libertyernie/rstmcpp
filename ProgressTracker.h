@@ -1,6 +1,6 @@
 #pragma once
 
-namespace RSTMCPP {
+namespace rstmcpp {
 	class ProgressTracker {
 	public:
 		ProgressTracker();

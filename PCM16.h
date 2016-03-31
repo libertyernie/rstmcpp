@@ -2,9 +2,9 @@
 
 #include <cstdint>
 
-namespace RSTMCPP {
-	namespace WAV {
-		struct PCM16Audio {
+namespace rstmcpp {
+	namespace pcm16 {
+		struct PCM16 {
 		public:
 			int channels;
 			int sampleRate;
@@ -16,15 +16,15 @@ namespace RSTMCPP {
 			int16_t* loop_start;
 			int16_t* loop_end;
 
-			PCM16Audio(int channels, int sampleRate, int16_t* sample_data, int sample_count);
-			PCM16Audio(int channels, int sampleRate, int16_t* sample_data, int sample_count, int loop_start, int loop_end);
+			PCM16(int channels, int sampleRate, int16_t* sample_data, int sample_count);
+			PCM16(int channels, int sampleRate, int16_t* sample_data, int sample_count, int loop_start, int loop_end);
 
 			int getBitsPerSample() { return 16; }
 			
 			int readSamples(void* destAddr, int numSamplesEachChannel);
 			void wrap();
 
-			~PCM16Audio();
+			~PCM16();
 
 		private:
 			void initWav(int channels, int sampleRate, int16_t* sample_data, int sample_count, int loop_start, int loop_end);

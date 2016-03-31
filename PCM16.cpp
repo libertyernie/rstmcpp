@@ -1,11 +1,11 @@
 #include <stdexcept>
 #include <cstdlib>
-#include <cstring>
-#include "PCM16.h"
+#include "pcm16.h"
 
 using std::memcpy;
+using namespace rstmcpp::pcm16;
 
-void RSTMCPP::WAV::PCM16Audio::initWav(int channels, int sampleRate, int16_t* sample_data, int sample_count, int loop_start, int loop_end) {
+void PCM16::initWav(int channels, int sampleRate, int16_t* sample_data, int sample_count, int loop_start, int loop_end) {
 	if (channels > 65535) throw std::invalid_argument("Streams of more than 65535 channels not supported");
 	if (channels <= 0) throw new std::invalid_argument("Number of channels must be a positive integer");
 	if (sampleRate <= 0) throw new std::invalid_argument("Sample rate must be a positive integer");
@@ -34,15 +34,15 @@ void RSTMCPP::WAV::PCM16Audio::initWav(int channels, int sampleRate, int16_t* sa
 	}
 }
 
-RSTMCPP::WAV::PCM16Audio::PCM16Audio(int channels, int sampleRate, int16_t* sample_data, int sample_count) {
+PCM16::PCM16(int channels, int sampleRate, int16_t* sample_data, int sample_count) {
 	initWav(channels, sampleRate, sample_data, sample_count, -1, -1);
 };
 
-RSTMCPP::WAV::PCM16Audio::PCM16Audio(int channels, int sampleRate, int16_t* sample_data, int sample_count, int loop_start, int loop_end) {
+PCM16::PCM16(int channels, int sampleRate, int16_t* sample_data, int sample_count, int loop_start, int loop_end) {
 	initWav(channels, sampleRate, sample_data, sample_count, loop_start, loop_end);
 };
 
-int RSTMCPP::WAV::PCM16Audio::readSamples(void* destAddr, int numSamplesEachChannel) {
+int PCM16::readSamples(void* destAddr, int numSamplesEachChannel) {
 	int numSamplesTotal = numSamplesEachChannel * this->channels;
 
 	if (this->samples_pos + numSamplesTotal > this->samples_end) {
@@ -55,6 +55,6 @@ int RSTMCPP::WAV::PCM16Audio::readSamples(void* destAddr, int numSamplesEachChan
 	return numSamplesTotal / this->channels;
 }
 
-RSTMCPP::WAV::PCM16Audio::~PCM16Audio() {
+PCM16::~PCM16() {
 	free(samples);
 }

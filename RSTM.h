@@ -3,55 +3,55 @@
 #include <cstring>
 
 #include "ssbbcommon.h"
-#include "RWAV.h"
 
-namespace RSTMCPP
+namespace rstmcpp
 {
-	struct HEADHeader;
-	struct ADPCHeader;
-	struct RSTMDATAHeader;
-
-	struct RSTMHeader
+	struct AudioFormatInfo
 	{
-		NW4RCommonHeader _header;
-		be_int32_t _headOffset;
-		be_int32_t _headLength;
-		be_int32_t _adpcOffset;
-		be_int32_t _adpcLength;
-		be_int32_t _dataOffset;
-		be_int32_t _dataLength;
+		uint8_t _encoding;
+		uint8_t _looped;
+		uint8_t _channels;
+		uint8_t _sampleRate24;
 
-		void Set(int headLen, int adpcLen, int dataLen)
+		AudioFormatInfo(uint8_t encoding, uint8_t looped, uint8_t channels, uint8_t unk)
 		{
-			int len = 0x40;
-
-			//Set header
-			_header._tag = 0x4D545352;
-			_header._endian = 0xFEFF;
-			_header._version = 0x100;
-			_header._firstOffset = 0x40;
-			_header._numEntries = 2;
-
-			//Set offsets/lengths
-			_headOffset = len;
-			_headLength = headLen;
-			_adpcOffset = (len += headLen);
-			_adpcLength = adpcLen;
-			_dataOffset = (len += adpcLen);
-			_dataLength = dataLen;
-
-			_header._length = len + dataLen;
-
-			//Fill padding
-			memset((uint8_t*)(&_header) + 0x28, 0, 0x18);
+			_encoding = encoding; _looped = looped; _channels = channels; _sampleRate24 = unk;
 		}
-
-		HEADHeader* HEADData() { return (HEADHeader*)((uint8_t*)&_header + _headOffset); }
-		ADPCHeader* ADPCData() { return (ADPCHeader*)((uint8_t*)&_header + _adpcOffset); }
-		RSTMDATAHeader* DATAData() { return (RSTMDATAHeader*)((uint8_t*)&_header + _dataOffset); }
 	};
 
-	struct StrmDataInfo;
+	struct ADPCMInfo
+	{
+		static const int Size = 0x30;
+
+		be_uint16_t _coefs[16];
+
+		be_uint16_t _gain;
+		be_int16_t _ps; //Predictor and scale. This will be initialized to the predictor and scale value of the sample's first frame.
+		be_int16_t _yn1; //History data; used to maintain decoder state during sample playback.
+		be_int16_t _yn2; //History data; used to maintain decoder state during sample playback.
+		be_int16_t _lps; //Predictor/scale for the loop point frame. If the sample does not loop, this value is zero.
+		be_int16_t _lyn1; //History data for the loop point. If the sample does not loop, this value is zero.
+		be_int16_t _lyn2; //History data for the loop point. If the sample does not loop, this value is zero.
+		int16_t _pad;
+	};
+
+	struct StrmDataInfo
+	{
+		AudioFormatInfo _format;
+		be_uint16_t _sampleRate; //0x7D00
+		be_uint16_t _blockHeaderOffset;
+		be_uint32_t _loopStartSample;
+		be_uint32_t _numSamples;
+		be_uint32_t _dataOffset;
+		be_uint32_t _numBlocks;
+		be_uint32_t _blockSize;
+		be_uint32_t _samplesPerBlock; //0x3800
+		be_uint32_t _lastBlockSize; //Without padding
+		be_uint32_t _lastBlockSamples;
+		be_uint32_t _lastBlockTotal; //Includes padding
+		be_uint32_t _dataInterval; //0x3800
+		be_uint32_t _bitsPerSample;
+	};
 
 	struct HEADHeader
 	{
@@ -121,24 +121,6 @@ namespace RSTMCPP
 		}
 	};
 
-	struct StrmDataInfo
-	{
-		AudioFormatInfo _format;
-		be_uint16_t _sampleRate; //0x7D00
-		be_uint16_t _blockHeaderOffset;
-		be_uint32_t _loopStartSample;
-		be_uint32_t _numSamples;
-		be_uint32_t _dataOffset;
-		be_uint32_t _numBlocks;
-		be_uint32_t _blockSize;
-		be_uint32_t _samplesPerBlock; //0x3800
-		be_uint32_t _lastBlockSize; //Without padding
-		be_uint32_t _lastBlockSamples;
-		be_uint32_t _lastBlockTotal; //Includes padding
-		be_uint32_t _dataInterval; //0x3800
-		be_uint32_t _bitsPerSample;
-	};
-
 	struct ADPCHeader
 	{
 		le_uint32_t _tag;
@@ -171,5 +153,45 @@ namespace RSTMCPP
 		}
 
 		void* Data() { return ((uint8_t*)&_tag) + 8 + _dataOffset; }
+	};
+
+	struct RSTMHeader
+	{
+		NW4RCommonHeader _header;
+		be_int32_t _headOffset;
+		be_int32_t _headLength;
+		be_int32_t _adpcOffset;
+		be_int32_t _adpcLength;
+		be_int32_t _dataOffset;
+		be_int32_t _dataLength;
+
+		void Set(int headLen, int adpcLen, int dataLen)
+		{
+			int len = 0x40;
+
+			//Set header
+			_header._tag = 0x4D545352;
+			_header._endian = 0xFEFF;
+			_header._version = 0x100;
+			_header._firstOffset = 0x40;
+			_header._numEntries = 2;
+
+			//Set offsets/lengths
+			_headOffset = len;
+			_headLength = headLen;
+			_adpcOffset = (len += headLen);
+			_adpcLength = adpcLen;
+			_dataOffset = (len += adpcLen);
+			_dataLength = dataLen;
+
+			_header._length = len + dataLen;
+
+			//Fill padding
+			memset((uint8_t*)(&_header) + 0x28, 0, 0x18);
+		}
+
+		HEADHeader* HEADData() { return (HEADHeader*)((uint8_t*)&_header + _headOffset); }
+		ADPCHeader* ADPCData() { return (ADPCHeader*)((uint8_t*)&_header + _adpcOffset); }
+		RSTMDATAHeader* DATAData() { return (RSTMDATAHeader*)((uint8_t*)&_header + _dataOffset); }
 	};
 }

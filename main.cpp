@@ -1,12 +1,13 @@
 #include <iostream>
 #include <cstring>
-#include "PCM16Factory.h"
-#include "RSTMConverter.h"
+#include "pcm16.h"
+#include "wavfactory.h"
+#include "encoder.h"
 
 using std::cerr;
 using std::endl;
-using namespace RSTMCPP;
-using namespace RSTMCPP::WAV;
+using namespace rstmcpp;
+using namespace rstmcpp::pcm16;
 
 int usage() {
 	cerr
@@ -125,7 +126,7 @@ int main(int argc, char** argv) {
 
 	if (!strcmp("RIFF", tag)) {
 		try {
-			PCM16Audio* wav = PCM16Factory::FromFile(inFile);
+			PCM16* wav = wavfactory::FromFile(inFile);
 			if (forceNoLoop) wav->looping = false;
 			if (forceLoop) wav->looping = true;
 			wav->loop_start = (wav->samples + loopStart * wav->channels);
@@ -133,7 +134,7 @@ int main(int argc, char** argv) {
 
 			ProgressTracker progress;
 			int size;
-			char* rstm = (char*)RSTMConverter::Encode(wav, &progress, &size);
+			char* rstm = (char*)encoder::EncodeRSTM(wav, &progress, &size);
 			delete wav;
 			while (size > 0) {
 				int r = fwrite(rstm, 1, size, outFile);

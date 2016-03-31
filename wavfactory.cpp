@@ -1,10 +1,10 @@
 #include <stdexcept>
 #include <cstring>
 #include "endian.h"
-#include "PCM16Factory.h"
+#include "wavfactory.h"
 
-using namespace RSTMCPP::WAV;
-using namespace RSTMCPP::endian;
+using namespace rstmcpp::pcm16;
+using namespace rstmcpp::endian;
 
 // WAVEFORMATEX
 struct fmt {
@@ -70,7 +70,7 @@ struct smpl_loop {
 	int32_t playCount;
 };
 
-PCM16Audio* PCM16Factory::FromFile(FILE* file) {
+PCM16* wavfactory::FromFile(FILE* file) {
 	char buffer[12];
 	int r = fread(buffer, 1, 12, file);
     if (r == 0) {
@@ -206,13 +206,13 @@ PCM16Audio* PCM16Factory::FromFile(FILE* file) {
 		sample_data_length_bytes *= 2;
     }
 
-    PCM16Audio* wav = new PCM16Audio(channels, sampleRate, sample_data, sample_data_length_bytes / 2, loopStart, loopEnd);
+    PCM16* wav = new PCM16(channels, sampleRate, sample_data, sample_data_length_bytes / 2, loopStart, loopEnd);
 
 	free(sample_data);
     return wav;
 }
 
-int PCM16Factory::exportWavSize(const PCM16Audio* lwav) {
+int wavfactory::exportWavSize(const PCM16* lwav) {
 	int length = 12 + 8 + sizeof(fmt) + 8 + ((lwav->samples_end - lwav->samples) * 2);
 	if (lwav->looping) {
 		length += 8 + sizeof(smpl) + sizeof(smpl_loop);
@@ -220,7 +220,7 @@ int PCM16Factory::exportWavSize(const PCM16Audio* lwav) {
 	return length;
 }
 
-void PCM16Factory::exportWav(const PCM16Audio* lwav, void* dest, int size) {
+void wavfactory::exportWav(const PCM16* lwav, void* dest, int size) {
 	char* ptr = (char*)dest;
 	*(ptr++) = 'R';
 	*(ptr++) = 'I';

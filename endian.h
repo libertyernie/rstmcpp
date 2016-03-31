@@ -5,9 +5,9 @@
 #else
 #include <arpa/inet.h> // for ntohs() etc.
 #endif
-#include <stdint.h>
+#include <cstdint>
 
-namespace RSTMCPP {
+namespace rstmcpp {
 	namespace endian {
 		int32_t swap32(int32_t num);
 		int16_t swap16(int16_t num);
