@@ -22,16 +22,16 @@ int usage() {
 	<< "they be held accountable for the manner in which it is used." << endl
 	<< endl
 	<< "Usage:" << endl
-	<< "stm - encode[options] <inputfile> <outputfile>" << endl
+	<< "rstmcpp [options] <inputfile> <outputfile>" << endl
 	<< endl
-	<< "inputfile can be.brstm, .bcstm, .bfstm, or .wav." << endl
-	<< "outputfile can be.brstm, .bcstm, or .bfstm." << endl
+	<< "inputfile can be .wav." << endl
+	<< "outputfile can be .brstm." << endl
 	<< endl
-	<< "Options(WAV input only) : " << endl
-	<< "- l             Loop from start of file until end of file" << endl
-	<< "- l<start>      Loop from sample <start> until end of file" << endl
+	<< "Options (WAV input only): " << endl
+	<< "- l               Loop from start of file until end of file" << endl
+	<< "- l<start>        Loop from sample <start> until end of file" << endl
 	<< "- l<start - end>  Loop from sample <start> until sample <end>" << endl
-	<< "- noloop        Do not loop(ignore smpl chunk in WAV file if one exists)" << endl;
+	<< "- noloop          Do not loop(ignore smpl chunk in WAV file if one exists)" << endl;
 	return 1;
 }
 
@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
 	while (argc > 0) {
 		if (!strcmp(*argv, "/?") || !strcmp(*argv, "-h") || !strcmp(*argv, "--help")) {
 			return usage();
-		} else if (*argv[0] == '-' && *argv[1] == 'l') {
+		} else if ((*argv)[0] == '-' && (*argv)[1] == 'l') {
 			forceLoop = true;
 			forceNoLoop = false;
 
@@ -142,11 +142,13 @@ int main(int argc, char** argv) {
 			int size;
 			char* rstm = (char*)encoder::encode_rstm(wav, &progress, &size);
 			delete wav;
+			char* ptr = rstm;
 			while (size > 0) {
-				int r = fwrite(rstm, 1, size, outFile);
-				rstm += r;
+				int r = fwrite(ptr, 1, size, outFile);
+				ptr += r;
 				size -= r;
 			}
+			free(rstm);
 		}
 		catch (std::exception& e) {
 			cerr << e.what() << endl;
@@ -161,5 +163,6 @@ int main(int argc, char** argv) {
 
 	}
 
-
+	fclose(inFile);
+	fclose(outFile);
 }
