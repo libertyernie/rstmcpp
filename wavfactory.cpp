@@ -17,14 +17,14 @@ struct fmt {
 };
 
 // GUID
-struct guid {
-	int64_t data1;
-	int32_t data2;
-	int32_t data3;
+struct le_guid {
+	le_int32_t data1;
+	le_int16_t data2;
+	le_int16_t data3;
 	uint8_t data4[8];
 };
 
-bool operator==(const struct guid& a, const struct guid& b)
+bool operator==(const struct le_guid& a, const struct le_guid& b)
 {
 	return a.data1 == b.data1
 		&& a.data2 == b.data2
@@ -32,18 +32,18 @@ bool operator==(const struct guid& a, const struct guid& b)
 		&& memcmp(a.data4, b.data4, 8) == 0;
 }
 
-const struct guid KSDATAFORMAT_SUBTYPE_PCM = { 0x00000001L, 0x0000, 0x0010,{ 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+const struct le_guid KSDATAFORMAT_SUBTYPE_PCM = { 0x00000001L, 0x0000, 0x0010,{ 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
 
 // WAVEFORMATEXTENSIBLE
 struct fmt_extensible {
 	struct fmt fmt;
 	union {
-		int16_t validBitsPerSample;
-		int16_t samplesPerBlock;
-		int16_t reserved;
+		le_int16_t validBitsPerSample;
+		le_int16_t samplesPerBlock;
+		le_int16_t reserved;
 	} samples;
-	int32_t channelMask;
-	guid subFormat;
+	le_int32_t channelMask;
+	le_guid subFormat;
 };
 
 struct smpl {
