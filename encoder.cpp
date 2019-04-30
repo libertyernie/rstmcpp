@@ -1,5 +1,6 @@
 #include "encoder.h"
 #include "pcm16.h"
+#include "cstm.h"
 #include "rstm.h"
 #include "grok.h"
 #include <cstdlib>
