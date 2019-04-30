@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
 					loopEnd = loopEnd * 10 + (*ptr - '0');
 				}
 			} else {
-				loopEnd = -1;
+				loopEnd = 0;
 			}
 		} else if (!strcmp(*argv, "-noloop")) {
 			forceNoLoop = true;
