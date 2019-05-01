@@ -1,5 +1,6 @@
 #include "encoder.h"
 #include "pcm16.h"
+#include "cwav.h"
 #include "cstm.h"
 #include "rstm.h"
 #include "grok.h"
@@ -23,11 +24,208 @@ void EncodeBlock(int16_t* source, int samples, uint8_t* dest, int16_t* coefs) {
 }
 
 char* encoder::encode(PCM16* stream, ProgressTracker* progress, int* sizeOut, int type) {
-    if (type == FileType::RSTM) {
-        return (char*)encode_rstm(stream, progress, sizeOut);
-    } else {
-        return (char*)encode_cstm(stream, progress, sizeOut);
+    switch(type) {
+        case FileType::RSTM:
+            return (char*)encode_rstm(stream, progress, sizeOut);
+        case FileType::CSTM:
+            return (char*)encode_cstm(stream, progress, sizeOut);
+        case FileType::CWAV:
+            return (char*)encode_cwav(stream, progress, sizeOut);
     }
+    return NULL;
+}
+
+CWAVHeader* encoder::encode_cwav(PCM16* stream, ProgressTracker* progress, int* sizeOut) {
+    int tmp;
+	bool looped = stream->looping;
+	int channels = stream->channels;
+	int samples;
+	int blocks;
+	int sampleRate = stream->sampleRate;
+	int lbSamples, lbSize, lbTotal;
+	int loopPadding, loopStart, totalSamples;
+	int16_t* tPtr;
+
+    int blockSize = 0x3800;
+
+	if (looped)
+	{
+		loopStart = (stream->loop_start - stream->samples) / stream->channels;
+		samples = (stream->loop_end - stream->samples) / stream->channels; //Set sample size to end sample. That way the audio gets cut off when encoding.
+
+		//If loop point doesn't land on a block, pad the stream so that it does.
+		if ((tmp = loopStart % blockSize) != 0)
+		{
+			loopPadding = blockSize - tmp;
+			loopStart += loopPadding;
+		} else
+			loopPadding = 0;
+
+		totalSamples = loopPadding + samples;
+	} else
+	{
+		loopPadding = loopStart = 0;
+		totalSamples = samples = (stream->samples_end - stream->samples) / stream->channels;
+	}
+
+	if (progress != nullptr)
+		progress->begin(0, totalSamples * channels * 3, 0);
+
+	blocks = (totalSamples + blockSize - 1) / blockSize;
+
+	//Initialize stream info
+	if ((tmp = totalSamples % blockSize) != 0)
+	{
+		lbSamples = tmp;
+		lbSize = (lbSamples + 13) / 14 * 8;
+		lbTotal = lbSize;
+		while (lbTotal % 0x20 != 0) lbTotal++; // TODO optimize?
+	} else
+	{
+		lbSamples = blockSize;
+		lbTotal = lbSize = 0x2000;
+	}
+
+    unsigned chanBlocks = ((lbSize / 8) + 4095) / 4096;
+
+	//Get section sizes
+	int cwavSize = 0x40;
+    int infoPackedSize = sizeof(le_uint32_t) * 2 + sizeof(CWAVDataInfo) + channels * (sizeof(CWAVReference) + sizeof(CWAVChannelInfo));
+    int infoSize = infoPackedSize + 0x0020 - infoPackedSize % 0x0020;
+	int dataSize = ((blocks - 1) * 0x2000 + lbTotal) * channels + 0x20;
+
+	if (sizeOut != nullptr) {
+		*sizeOut = cwavSize + infoSize + dataSize;
+	}
+	void* address = malloc(cwavSize + infoSize + dataSize);
+	memset(address, 0, cwavSize + infoSize + dataSize);
+
+	//Get section pointers
+	CWAVHeader* cwav = (CWAVHeader*)address;
+	CWAVINFOHeader* info = (CWAVINFOHeader*)((uint8_t*)cwav + cwavSize);
+	CWAVDataHeader* data = (CWAVDataHeader*)((uint8_t*)info + infoSize);
+
+	//Set HEAD data
+    StrmDataInfo strmDataInfo;
+    strmDataInfo._format = AudioFormatInfo(2, (uint8_t)(looped ? 1: 0), (uint8_t)channels, 0);
+    strmDataInfo._sampleRate = (uint16_t)sampleRate;
+    strmDataInfo._loopStartSample = loopStart;
+    strmDataInfo._numSamples = totalSamples;
+
+	//Initialize sections
+	cwav->Set(infoSize, dataSize);
+    info->Set(infoSize, channels, &strmDataInfo, lbSize);
+	data->Set(dataSize);
+
+    //Create one ADPCMInfo for each channel
+	vector<CWAVADPCMInfo*> pAdpcm;
+	for (int i = 0; i < channels; i++)
+	{
+		CWAVADPCMInfo* p = &info->GetChannelInfo(i)->_adpcmInfo;
+		*p = CWAVADPCMInfo();
+		pAdpcm.push_back(p);
+	}
+
+	//Create buffer for each channel
+	vector<int16_t*> channelBuffers;
+	int bufferSamples = totalSamples + 2; //Add two samples for initial yn values
+	for (int i = 0; i < channels; i++)
+	{
+		channelBuffers.push_back(tPtr = (int16_t*)malloc(bufferSamples * 2)); //Two bytes per sample
+
+		//Zero padding samples and initial yn values
+		for (int x = 0; x < (loopPadding + 2); x++)
+			*tPtr++ = 0;
+	}
+
+	//Fill buffers
+	stream->samples_pos = stream->samples;
+	int16_t* sampleBuffer = (int16_t*)malloc(channels * sizeof(int16_t*));
+
+	for (int i = 2; i < bufferSamples; i++)
+	{
+		if (looped && stream->samples_pos == stream->loop_end)
+			stream->samples_pos = stream->loop_start;
+
+		stream->readSamples(sampleBuffer, 1);
+		for (int x = 0; x < channels; x++)
+			channelBuffers[x][i] = sampleBuffer[x];
+	}
+
+	free(sampleBuffer);
+
+	//Calculate coefs
+	for (int i = 0; i < channels; i++) {
+		DSPCorrelateCoefs(channelBuffers[i] + 2, totalSamples, (int16_t*)pAdpcm[i]);
+		if (progress)
+			progress->update(progress->currentValue + totalSamples);
+	}
+
+	//Encode blocks
+    //Only works for single channels...not sure why yet.
+	uint8_t* dPtr = (uint8_t*)data->Data();
+
+    for (int x = 0; x < channels; x++)
+    {
+        for (int sIndex = 0, bIndex = 1; sIndex < totalSamples; sIndex += blockSize, bIndex++)
+        {
+		int blockSamples = totalSamples - sIndex;
+		if (blockSamples > blockSize) blockSamples = blockSize;
+
+			int16_t* sPtr = channelBuffers[x] + sIndex;
+
+            //Encode block (include yn in sPtr)
+			EncodeBlock(sPtr, blockSamples, dPtr, (int16_t*)pAdpcm[x]);
+
+			//Set initial ps
+			if (bIndex == 1)
+				pAdpcm[x]->_ps = *dPtr;
+
+			//Advance output pointer
+			if (bIndex == blocks)
+			{
+				//Fill remaining
+				dPtr += lbSize;
+				for (int i = lbSize; i < lbTotal; i++)
+					*(dPtr++) = 0;
+			}else
+                dPtr += 0x2000;
+
+            if (progress != nullptr)
+            {
+                if ((sIndex % blockSize) == 0)
+                    progress->update(progress->currentValue + (blockSize * 2 * channels));
+            }
+        }
+	}
+
+	//Write loop states
+	if (looped)
+	{
+		//Can't we just use block states?
+		int loopBlock = loopStart / blockSize;
+		int loopChunk = (loopStart - (loopBlock * blockSize)) / 14;
+		dPtr = (uint8_t*)data->Data() + (loopBlock * 0x2000 * channels) + (loopChunk * 8);
+		tmp = (loopBlock == blocks - 1) ? lbTotal : 0x2000;
+
+		for (int i = 0; i < channels; i++, dPtr += tmp)
+		{
+			//Use adjusted samples for yn values
+			tPtr = channelBuffers[i] + loopStart;
+			pAdpcm[i]->_lps = *dPtr;
+			pAdpcm[i]->_lyn2 = *tPtr++;
+			pAdpcm[i]->_lyn1 = *tPtr;
+		}
+	}
+
+	//Free memory
+	for (int i = 0; i < channels; i++)
+		free(channelBuffers[i]);
+
+	if (progress != nullptr)
+		progress->finish();
+
+    return cwav;
 }
 
 CSTMHeader* encoder::encode_cstm(PCM16* stream, ProgressTracker* progress, int* sizeOut) {
@@ -49,37 +247,37 @@ CSTMHeader* encoder::encode_cstm(PCM16* stream, ProgressTracker* progress, int* 
     void* address = malloc(rstmSize + infoSize + seekSize + dataSize);
 	memset(address, 0, rstmSize + infoSize + seekSize + dataSize);
 
-        //Get section pointers
-        CSTMHeader* cstm = (CSTMHeader*)address;
-        CSTMINFOHeader* info = (CSTMINFOHeader*)((uint8_t*)cstm + rstmSize);
-        CSTMSEEKHeader* seek = (CSTMSEEKHeader*)((uint8_t*)info + infoSize);
-        CSTMDATAHeader* data = (CSTMDATAHeader*)((uint8_t*)seek + seekSize);
+    //Get section pointers
+    CSTMHeader* cstm = (CSTMHeader*)address;
+    CSTMINFOHeader* info = (CSTMINFOHeader*)((uint8_t*)cstm + rstmSize);
+    CSTMSEEKHeader* seek = (CSTMSEEKHeader*)((uint8_t*)info + infoSize);
+    CSTMDATAHeader* data = (CSTMDATAHeader*)((uint8_t*)seek + seekSize);
 
-        //Initialize sections
-        cstm->Set(infoSize, seekSize, dataSize);
-        info->Set(infoSize, channels);
-        seek->Set(seekSize);
-        data->Set(dataSize);
+    //Initialize sections
+    cstm->Set(infoSize, seekSize, dataSize);
+    info->Set(infoSize, channels);
+    seek->Set(seekSize);
+    data->Set(dataSize);
 
-        //Set HEAD data
-        info->_dataInfo = CSTMDataInfo(strmDataInfo);
+    //Set HEAD data
+    info->_dataInfo = CSTMDataInfo(strmDataInfo);
 
-        //Create one ADPCMInfo for each channel
-        //IntPtr* adpcData = stackalloc IntPtr[channels];
-        for (int i = 0; i < channels; i++) {
-            *info->GetChannelInfo(i) = CSTMADPCMInfo(rstm->HEADData()->GetChannelInfo(i));
-        }
+    //Create one ADPCMInfo for each channel
+    //IntPtr* adpcData = stackalloc IntPtr[channels];
+    for (int i = 0; i < channels; i++) {
+        *info->GetChannelInfo(i) = CSTMADPCMInfo(rstm->HEADData()->GetChannelInfo(i));
+    }
 
-        be_int16_t* seekFrom = (be_int16_t*)rstm->ADPCData()->Data();
-        short* seekTo = (short*)seek->Data();
-        for (int i = 0; i < seek->_length / 2 - 8; i++)
-        {
-            *(seekTo++) = *(seekFrom++);
-        }
+    be_int16_t* seekFrom = (be_int16_t*)rstm->ADPCData()->Data();
+    short* seekTo = (short*)seek->Data();
+    for (int i = 0; i < seek->_length / 2 - 8; i++)
+    {
+        *(seekTo++) = *(seekFrom++);
+    }
 
-        uint8_t* dataFrom = (uint8_t*)rstm->DATAData()->Data();
-        uint8_t* dataTo = data->Data();
-        memmove(dataTo, dataFrom, (uint32_t)data->_length - sizeof(uint32_t) * 8);
+    uint8_t* dataFrom = (uint8_t*)rstm->DATAData()->Data();
+    uint8_t* dataTo = data->Data();
+    memmove(dataTo, dataFrom, (uint32_t)data->_length - sizeof(uint32_t) * 8);
     return cstm;
 }
 

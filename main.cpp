@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstring>
+#include <map>
 #include "pcm16.h"
 #include "wavfactory.h"
 #include "encoder.h"
@@ -25,7 +26,7 @@ int usage() {
 	<< "rstmcpp [options] <inputfile> <outputfile>" << endl
 	<< endl
 	<< "inputfile can be .wav." << endl
-	<< "outputfile can be .brstm or .bcstm." << endl
+	<< "outputfile can be .brstm, .bcstm or .bcwav (single channel only)." << endl
 	<< endl
 	<< "Options (WAV input only): " << endl
 	<< "- l               Loop from start of file until end of file" << endl
@@ -121,7 +122,7 @@ int main(int argc, char** argv) {
 	while (ext > outputFile && ext[0] != '.') {
 		ext--;
 	}
-	if (!strcmp(".brstm", ext) && !strcmp(".bcstm", ext) && !strcmp(".bfstm", ext)) {
+	if (!strcmp(".brstm", ext) && !strcmp(".bcstm", ext) && !strcmp(".bfstm", ext) && !strcmp(".bcwav", ext)) {
 		cerr << "Unsupported output format: " << ext << endl;
 		return 1;
 	}
@@ -139,10 +140,15 @@ int main(int argc, char** argv) {
 					wav->loop_end = (wav->samples + loopEnd * wav->channels);
 				}
 			}
-
+            std::map<std::string, int> fileType = {
+                {".brstm", encoder::FileType::RSTM},
+                {".bcstm", encoder::FileType::CSTM},
+                {".bcwav", encoder::FileType::CWAV},
+                {".bfstm", encoder::FileType::BFSTM}
+            };
 			ProgressTracker progress;
 			int size;
-            int type = !strcmp(".brstm", ext) ? 0 : 1;
+            int type = fileType[ext];
             char* output = (char*)encoder::encode(wav, &progress, &size, type);
             delete wav;
 			char* ptr = output;
