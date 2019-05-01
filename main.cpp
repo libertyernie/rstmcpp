@@ -140,15 +140,16 @@ int main(int argc, char** argv) {
 
 			ProgressTracker progress;
 			int size;
-			char* rstm = (char*)encoder::encode_rstm(wav, &progress, &size);
-			delete wav;
-			char* ptr = rstm;
+            int type = !strcmp(".brstm", ext) ? 0 : 1;
+            char* output = (char*)encoder::encode(wav, &progress, &size, type);
+            delete wav;
+			char* ptr = output;
 			while (size > 0) {
 				int r = fwrite(ptr, 1, size, outFile);
 				ptr += r;
 				size -= r;
 			}
-			free(rstm);
+			free(output);
 		}
 		catch (std::exception& e) {
 			cerr << e.what() << endl;

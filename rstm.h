@@ -13,6 +13,10 @@ namespace rstmcpp
 		uint8_t _channels;
 		uint8_t _sampleRate24;
 
+        AudioFormatInfo() {
+            _encoding = 0; _looped = 0; _channels = 0; _sampleRate24 = 0;
+        }
+
 		AudioFormatInfo(uint8_t encoding, uint8_t looped, uint8_t channels, uint8_t unk)
 		{
 			_encoding = encoding; _looped = looped; _channels = channels; _sampleRate24 = unk;

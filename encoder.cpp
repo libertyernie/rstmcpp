@@ -4,10 +4,12 @@
 #include "rstm.h"
 #include "grok.h"
 #include <cstdlib>
+#include <iostream>
 #include <vector>
 
 using std::malloc;
 using std::vector;
+using std::cerr;
 
 using namespace rstmcpp;
 using namespace rstmcpp::pcm16;
@@ -18,6 +20,67 @@ void EncodeBlock(int16_t* source, int samples, uint8_t* dest, int16_t* coefs) {
 		if (s > 14) s = 14;
 		DSPEncodeFrame(source, s, dest, coefs);
 	}
+}
+
+char* encoder::encode(PCM16* stream, ProgressTracker* progress, int* sizeOut, int type) {
+    if (type == FileType::RSTM) {
+        return (char*)encode_rstm(stream, progress, sizeOut);
+    } else {
+        return (char*)encode_cstm(stream, progress, sizeOut);
+    }
+}
+
+CSTMHeader* encoder::encode_cstm(PCM16* stream, ProgressTracker* progress, int* sizeOut) {
+    RSTMHeader* rstm = encoder::encode_rstm(stream, progress, sizeOut);
+
+    StrmDataInfo* strmDataInfo = rstm->HEADData()->Part1();
+    int channels = strmDataInfo->_format._channels;
+
+    if (strmDataInfo->_format._encoding != 2)
+        cerr << "CSTM export only supports ADPCM encoding." << endl;
+
+    // Get section sizes from the BRSTM - BCSTM is such a similar format that we can assume the sizes will match.
+    int rstmSize = 0x40;
+    int infoSize = rstm->_headLength;
+    int seekSize = rstm->_adpcLength;
+    int dataSize = rstm->_dataLength;
+
+    //Create byte array
+    void* address = malloc(rstmSize + infoSize + seekSize + dataSize);
+	memset(address, 0, rstmSize + infoSize + seekSize + dataSize);
+
+        //Get section pointers
+        CSTMHeader* cstm = (CSTMHeader*)address;
+        CSTMINFOHeader* info = (CSTMINFOHeader*)((uint8_t*)cstm + rstmSize);
+        CSTMSEEKHeader* seek = (CSTMSEEKHeader*)((uint8_t*)info + infoSize);
+        CSTMDATAHeader* data = (CSTMDATAHeader*)((uint8_t*)seek + seekSize);
+
+        //Initialize sections
+        cstm->Set(infoSize, seekSize, dataSize);
+        info->Set(infoSize, channels);
+        seek->Set(seekSize);
+        data->Set(dataSize);
+
+        //Set HEAD data
+        info->_dataInfo = CSTMDataInfo(strmDataInfo);
+
+        //Create one ADPCMInfo for each channel
+        //IntPtr* adpcData = stackalloc IntPtr[channels];
+        for (int i = 0; i < channels; i++) {
+            *info->GetChannelInfo(i) = CSTMADPCMInfo(rstm->HEADData()->GetChannelInfo(i));
+        }
+
+        be_int16_t* seekFrom = (be_int16_t*)rstm->ADPCData()->Data();
+        short* seekTo = (short*)seek->Data();
+        for (int i = 0; i < seek->_length / 2 - 8; i++)
+        {
+            *(seekTo++) = *(seekFrom++);
+        }
+
+        uint8_t* dataFrom = (uint8_t*)rstm->DATAData()->Data();
+        uint8_t* dataTo = data->Data();
+        memmove(dataTo, dataFrom, (uint32_t)data->_length - sizeof(uint32_t) * 8);
+    return cstm;
 }
 
 RSTMHeader* encoder::encode_rstm(PCM16* stream, ProgressTracker* progress, int* sizeOut) {
