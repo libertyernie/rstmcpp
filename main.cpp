@@ -61,6 +61,7 @@ int main(int argc, char** argv) {
 			while (*ptr >= '0' && *ptr <= '9') {
 				// Parse digit
 				loopStart = loopStart * 10 + (*ptr - '0');
+                ptr++;
 			}
 			if (*ptr == '-') {
 				// Get loop end
@@ -69,6 +70,7 @@ int main(int argc, char** argv) {
 				while (*ptr >= '0' && *ptr <= '9') {
 					// Parse digit
 					loopEnd = loopEnd * 10 + (*ptr - '0');
+                    ptr++;
 				}
 			} else {
 				loopEnd = 0;
