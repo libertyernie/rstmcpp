@@ -114,7 +114,7 @@ CWAVHeader* encoder::encode_cwav(PCM16* stream, ProgressTracker* progress, int* 
 
 	//Initialize sections
 	cwav->Set(infoSize, dataSize);
-    info->Set(infoSize, channels, &strmDataInfo, lbSize);
+    info->Set(infoSize, channels, &strmDataInfo, (totalSamples + 13) / 14 * 8);
 	data->Set(dataSize);
 
     //Create one ADPCMInfo for each channel
@@ -162,7 +162,7 @@ CWAVHeader* encoder::encode_cwav(PCM16* stream, ProgressTracker* progress, int* 
 	}
 
 	//Encode blocks
-    //Only works for single channels...not sure why yet.
+    //This order is different from brstm.
 	uint8_t* dPtr = (uint8_t*)data->Data();
 
     for (int x = 0; x < channels; x++)
