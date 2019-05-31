@@ -26,7 +26,7 @@ int usage() {
 	<< "rstmcpp [options] <inputfile> <outputfile>" << endl
 	<< endl
 	<< "inputfile can be .wav." << endl
-	<< "outputfile can be .brstm, .bcstm or .bcwav (single channel only)." << endl
+	<< "outputfile can be .brstm, .bcstm or .bcwav." << endl
 	<< endl
 	<< "Options (WAV input only): " << endl
 	<< "- l               Loop from start of file until end of file" << endl
