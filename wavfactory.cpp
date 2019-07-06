@@ -110,7 +110,7 @@ PCM16* wavfactory::from_file(FILE* file) {
 			int32_t chunklength = *px;
 
             char* buffer2;
-            if (id == "data" && chunklength == -1) {
+            if (strcmp(id, "data") == 0 && chunklength == -1) {
 				throw std::runtime_error("No length specified in data chunk");
             } else {
                 // Look at the length of the chunk and read that many bytes into a byte array.
@@ -123,7 +123,7 @@ PCM16* wavfactory::from_file(FILE* file) {
 					if (r == 0) {
 						char str[128];
 						str[127] = '\0';
-						snprintf(str, 127, "Unexpected end of data in \"%s\" chunk: expected %d bytes, got %d bytes", id, end - buffer2, end - ptr);
+						snprintf(str, 127, "Unexpected end of data in \"%s\" chunk: expected %lu bytes, got %lu bytes", id, end - buffer2, end - ptr);
 						throw std::runtime_error(str);
 					}
                 }
