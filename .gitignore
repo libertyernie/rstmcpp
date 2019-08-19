@@ -1,0 +1,4 @@
+rstmcpp-clr/Debug
+rstmcpp-clr/Release
+*.VC.db
+*.suo
