@@ -108,6 +108,7 @@ PCM16* wavfactory::from_file(FILE* file) {
 
 			le_int32_t* px = (le_int32_t*)(buffer + 4);
 			int32_t chunklength = *px;
+            chunklength += chunklength % 2; // Make sure odd numbered chunk sizes are padded so that we are aligned correctly while reading chunks
 
             char* buffer2;
             if (strcmp(id, "data") == 0 && chunklength == -1) {
@@ -178,7 +179,7 @@ PCM16* wavfactory::from_file(FILE* file) {
                     loopEnd = loop->end;
                 }
             } else {
-                //Console.Error.WriteLine("Ignoring unknown chunk " + id);
+                //printf("Ignoring unknown chunk %s\n", id);
             }
 
 			if ((void*)buffer2 != (void*)sample_data) {
@@ -197,7 +198,7 @@ PCM16* wavfactory::from_file(FILE* file) {
     if (convert_from_8_bit) {
         le_int16_t* new_sample_data = (le_int16_t*)malloc(sample_data_length_bytes * 2);
         uint8_t* ptr = (uint8_t*)sample_data;
-        for (int i = 0; i < sample_data_length_bytes * 2; i++) {
+        for (int i = 0; i < sample_data_length_bytes; i++) {
             new_sample_data[i] = (le_int16_t)((ptr[i] - 0x80) << 8);
         }
 
