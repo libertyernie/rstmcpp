@@ -1,7 +1,7 @@
 #pragma once
 
-#ifdef _MSC_VER
-#include <WinSock2.h>
+#if defined _WIN32 && !defined __CYGWIN__
+#include <winsock2.h>
 #else
 #include <arpa/inet.h> // for ntohs() etc.
 #endif
